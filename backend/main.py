@@ -1,15 +1,14 @@
 from fastapi import FastAPI
-from datetime import datetime
+from database import Base, engine
+from api import health, auth
+import models.user
 
-app = FastAPI(title = "Network Device Monitoring System")
+app = FastAPI(title="Network Device Monitoring System")
 
-@app.get("/health")
-def healthcheck():
-    return {
-        "status" : "ok",
-        "timestamp" : datetime.utcnow(),
-        "service" : "backend",
-        "message" : "API is healthy and running"
-    }
+@app.on_event("startup")
+def on_startup():
+    Base.metadata.create_all(bind = engine)
 
 
+app.include_router(health.router)
+app.include_router(auth.router, prefix="/auth")
