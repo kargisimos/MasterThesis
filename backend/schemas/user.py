@@ -23,6 +23,12 @@ class UserOut(BaseModel):
     class Config:
         orm_mode = True
 
+class UserUpdate(BaseModel):
+    full_name: Optional[str] = None
+    email: Optional[str] = None
+    role: Optional[UserRole] = None
+    is_active: Optional[bool] = None
+
 class Token(BaseModel):
     access_token: str
     token_type: str = "bearer"
