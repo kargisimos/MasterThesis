@@ -55,7 +55,7 @@ export default function Settings() {
       setCurrentPassword("");
       setNewPassword("");
     } catch {
-      setMessage("Failed to update password.");
+      setMessage("Wrong current password.");
     }
   };
 

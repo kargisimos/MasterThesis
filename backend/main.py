@@ -1,6 +1,7 @@
 from fastapi import FastAPI
-from database import Base, engine
+from database import Base, engine, SessionLocal
 from api import health, auth, users
+from api.bootstrap import create_default_admin
 import models.user
 from fastapi.middleware.cors import CORSMiddleware
 
@@ -8,7 +9,14 @@ app = FastAPI(title="Network Device Monitoring System")
 
 @app.on_event("startup")
 def on_startup():
-    Base.metadata.create_all(bind = engine)
+    Base.metadata.create_all(bind=engine)
+
+    db = SessionLocal()
+    try:
+        create_default_admin(db)
+    finally:
+        db.close()
+
 
 origins = [
     "http://localhost:5173",

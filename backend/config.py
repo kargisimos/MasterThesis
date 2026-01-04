@@ -14,6 +14,11 @@ class Settings(BaseSettings):
     POSTGRES_HOST: str
     POSTGRES_PORT: int
 
+    DEFAULT_ADMIN_EMAIL: str
+    DEFAULT_ADMIN_PASSWORD: str
+    DEFAULT_ADMIN_FULL_NAME: str
+
+
     class Config:
         env_file = ".env"
         extra = "ignore"
