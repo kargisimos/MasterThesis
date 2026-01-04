@@ -8,7 +8,8 @@ const PAGE_SIZE = 5;
 
 export default function Users() {
   const navigate = useNavigate();
-  const token = localStorage.getItem("token");
+  const accessToken = localStorage.getItem("access_token");
+  const refreshToken = localStorage.getItem("refresh_token");
 
   const [users, setUsers] = useState([]);
   const [editingUserId, setEditingUserId] = useState(null);
@@ -16,34 +17,34 @@ export default function Users() {
   const [search, setSearch] = useState("");
   const [page, setPage] = useState(1);
 
+  const [showAddForm, setShowAddForm] = useState(false);
+  const [newUser, setNewUser] = useState({
+    email: "",
+    full_name: "",
+    password: "",
+    role: "viewer",
+  });
+
   let currentUserEmail = null;
   let currentUserRole = null;
 
-  const [showAddForm, setShowAddForm] = useState(false);
-  const [newUser, setNewUser] = useState({
-  email: "",
-  full_name: "",
-  password: "",
-  role: "viewer",
-});
-
-
-  if (token) {
+  if (accessToken) {
     try {
-      const payload = JSON.parse(atob(token.split(".")[1]));
+      const payload = JSON.parse(atob(accessToken.split(".")[1]));
       currentUserEmail = payload.sub;
       currentUserRole = payload.role;
     } catch {
-      localStorage.removeItem("token");
+      localStorage.removeItem("access_token");
+      localStorage.removeItem("refresh_token");
       navigate("/");
     }
   }
 
   useEffect(() => {
-    if (!token) return navigate("/");
+    if (!accessToken) return navigate("/");
     if (currentUserRole !== "admin") return navigate("/dashboard");
     fetchUsers();
-  }, []);
+  }, [accessToken, currentUserRole, navigate]);
 
   const fetchUsers = async () => {
     const res = await api.get("/users/");
@@ -77,8 +78,6 @@ export default function Users() {
     });
     fetchUsers();
   };
-  
-
 
   const saveEdit = async (userId) => {
     await api.patch(`/users/${userId}`, formData);
@@ -108,8 +107,6 @@ export default function Users() {
     page * PAGE_SIZE
   );
 
-
-
   return (
     <div className="dashboard-container">
       <aside className="dashboard-sidebar">
@@ -122,7 +119,8 @@ export default function Users() {
             <button
               className="logout-button"
               onClick={() => {
-                localStorage.removeItem("token");
+                localStorage.removeItem("access_token");
+                localStorage.removeItem("refresh_token");
                 navigate("/");
               }}
             >
@@ -136,53 +134,51 @@ export default function Users() {
         <div className="dashboard-card">
           <h1>Users</h1>
           <button
-  onClick={() => setShowAddForm(!showAddForm)}
-  style={{ marginBottom: "15px" }}
->
-  {showAddForm ? "Cancel" : "Add User"}
-</button>
-{showAddForm && (
-  <form onSubmit={createUser} style={{ marginBottom: "20px" }}>
-    <input
-      placeholder="Email"
-      value={newUser.email}
-      onChange={(e) =>
-        setNewUser({ ...newUser, email: e.target.value })
-      }
-      required
-    />
-    <input
-      placeholder="Full Name"
-      value={newUser.full_name}
-      onChange={(e) =>
-        setNewUser({ ...newUser, full_name: e.target.value })
-      }
-      required
-    />
-    <input
-      type="password"
-      placeholder="Password"
-      value={newUser.password}
-      onChange={(e) =>
-        setNewUser({ ...newUser, password: e.target.value })
-      }
-      required
-    />
-    <select
-      value={newUser.role}
-      onChange={(e) =>
-        setNewUser({ ...newUser, role: e.target.value })
-      }
-    >
-      {ROLES.map((r) => (
-        <option key={r} value={r}>{r}</option>
-      ))}
-    </select>
-
-    <button type="submit">Create</button>
-  </form>
-)}
-
+            onClick={() => setShowAddForm(!showAddForm)}
+            style={{ marginBottom: "15px" }}
+          >
+            {showAddForm ? "Cancel" : "Add User"}
+          </button>
+          {showAddForm && (
+            <form onSubmit={createUser} style={{ marginBottom: "20px" }}>
+              <input
+                placeholder="Email"
+                value={newUser.email}
+                onChange={(e) =>
+                  setNewUser({ ...newUser, email: e.target.value })
+                }
+                required
+              />
+              <input
+                placeholder="Full Name"
+                value={newUser.full_name}
+                onChange={(e) =>
+                  setNewUser({ ...newUser, full_name: e.target.value })
+                }
+                required
+              />
+              <input
+                type="password"
+                placeholder="Password"
+                value={newUser.password}
+                onChange={(e) =>
+                  setNewUser({ ...newUser, password: e.target.value })
+                }
+                required
+              />
+              <select
+                value={newUser.role}
+                onChange={(e) =>
+                  setNewUser({ ...newUser, role: e.target.value })
+                }
+              >
+                {ROLES.map((r) => (
+                  <option key={r} value={r}>{r}</option>
+                ))}
+              </select>
+              <button type="submit">Create</button>
+            </form>
+          )}
 
           <input
             placeholder="Search users..."
@@ -216,7 +212,6 @@ export default function Users() {
                       user.email
                     )}
                   </td>
-
                   <td>
                     {editingUserId === user.id ? (
                       <input
@@ -229,7 +224,6 @@ export default function Users() {
                       user.full_name
                     )}
                   </td>
-
                   <td>
                     {editingUserId === user.id ? (
                       <select
@@ -246,7 +240,6 @@ export default function Users() {
                       user.role
                     )}
                   </td>
-
                   <td>
                     {editingUserId === user.id ? (
                       <input
@@ -260,7 +253,6 @@ export default function Users() {
                       user.is_active ? "Yes" : "No"
                     )}
                   </td>
-
                   <td>
                     {editingUserId === user.id ? (
                       <>

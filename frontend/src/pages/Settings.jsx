@@ -5,7 +5,7 @@ import "./Dashboard.css";
 
 export default function Settings() {
   const navigate = useNavigate();
-  const token = localStorage.getItem("token");
+  const accessToken = localStorage.getItem("access_token");
 
   const [profile, setProfile] = useState(null);
   const [currentPassword, setCurrentPassword] = useState("");
@@ -14,30 +14,32 @@ export default function Settings() {
 
   let userRole = null;
 
-  if (token) {
+  if (accessToken) {
     try {
-      const payload = JSON.parse(atob(token.split(".")[1]));
+      const payload = JSON.parse(atob(accessToken.split(".")[1]));
       userRole = payload.role;
     } catch {
-      localStorage.removeItem("token");
+      localStorage.removeItem("access_token");
+      localStorage.removeItem("refresh_token");
       navigate("/");
     }
   }
 
   useEffect(() => {
-    if (!token) {
+    if (!accessToken) {
       navigate("/");
       return;
     }
     fetchProfile();
-  }, []);
+  }, [accessToken, navigate]);
 
   const fetchProfile = async () => {
     try {
       const res = await api.get("/users/me");
       setProfile(res.data);
     } catch {
-      localStorage.removeItem("token");
+      localStorage.removeItem("access_token");
+      localStorage.removeItem("refresh_token");
       navigate("/");
     }
   };
@@ -59,8 +61,8 @@ export default function Settings() {
     }
   };
 
-  const decodedToken = token
-    ? JSON.parse(atob(token.split(".")[1]))
+  const decodedToken = accessToken
+    ? JSON.parse(atob(accessToken.split(".")[1]))
     : null;
 
   return (
@@ -75,7 +77,8 @@ export default function Settings() {
             <button
               className="logout-button"
               onClick={() => {
-                localStorage.removeItem("token");
+                localStorage.removeItem("access_token");
+                localStorage.removeItem("refresh_token");
                 navigate("/");
               }}
             >
@@ -89,7 +92,6 @@ export default function Settings() {
         <div className="dashboard-card">
           <h1>Settings</h1>
 
-          {/* VIEW PROFILE */}
           <section style={{ marginBottom: "30px" }}>
             <h2>Profile</h2>
             {profile && (
@@ -102,7 +104,6 @@ export default function Settings() {
             )}
           </section>
 
-          {/* CHANGE PASSWORD */}
           <section style={{ marginBottom: "30px" }}>
             <h2>Change Password</h2>
             <form onSubmit={handleChangePassword}>
@@ -127,7 +128,6 @@ export default function Settings() {
             {message && <p style={{ marginTop: "10px" }}>{message}</p>}
           </section>
 
-          {/* SYSTEM INFO */}
           <section>
             <h2>System Information</h2>
             <ul>

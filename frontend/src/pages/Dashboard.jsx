@@ -1,27 +1,33 @@
-import React, { useEffect } from "react";
+import React, { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import "./Dashboard.css";
 
 export default function Dashboard() {
   const navigate = useNavigate();
-  const token = localStorage.getItem("token");
-  let userRole = null;
-
-  if (token) {
-    try {
-      const payload = JSON.parse(atob(token.split(".")[1]));
-      userRole = payload.role;
-    } catch (e) {
-      localStorage.removeItem("token");
-      navigate("/");
-    }
-  }
+  const accessToken = localStorage.getItem("access_token");
+  const refreshToken = localStorage.getItem("refresh_token");
+  const [userRole, setUserRole] = useState(null);
 
   useEffect(() => {
-    if (!token) {
+    if (!accessToken) {
+      navigate("/");
+      return;
+    }
+    try {
+      const payload = JSON.parse(atob(accessToken.split(".")[1]));
+      setUserRole(payload.role);
+    } catch (e) {
+      localStorage.removeItem("access_token");
+      localStorage.removeItem("refresh_token");
       navigate("/");
     }
-  }, [token, navigate]);
+  }, [accessToken, navigate]);
+
+  const handleLogout = () => {
+    localStorage.removeItem("access_token");
+    localStorage.removeItem("refresh_token");
+    navigate("/");
+  };
 
   return (
     <div className="dashboard-container">
@@ -32,13 +38,7 @@ export default function Dashboard() {
           {userRole === "admin" && <li><a href="/users">Users</a></li>}
           <li><a href="/settings">Settings</a></li>
           <li>
-            <button
-              className="logout-button"
-              onClick={() => {
-                localStorage.removeItem("token");
-                navigate("/");
-              }}
-            >
+            <button className="logout-button" onClick={handleLogout}>
               Logout
             </button>
           </li>

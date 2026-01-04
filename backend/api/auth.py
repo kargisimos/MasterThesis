@@ -30,23 +30,110 @@ def verify_password(plain_password, hashed_password):
 def get_password_hash(password):
     return pwd_context.hash(password)
 
-def create_access_token(data: dict, expires_delta: timedelta | None = None):
-    to_encode = data.copy()
-    expire = datetime.utcnow() + (expires_delta or timedelta(minutes=settings.ACCESS_TOKEN_EXPIRE_MINUTES))
-    to_encode.update({"exp": expire})
-    encoded_jwt = jwt.encode(to_encode, settings.SECRET_KEY, algorithm=settings.ALGORITHM)
-    return encoded_jwt
+def create_access_token(data: dict) -> str:
+    expire = datetime.utcnow() + timedelta(
+        minutes=settings.ACCESS_TOKEN_EXPIRE_MINUTES
+    )
+    to_encode = {**data, "exp": expire}
+    return jwt.encode(
+        to_encode, settings.SECRET_KEY, algorithm=settings.ALGORITHM
+    )
+
+
+def create_refresh_token(data: dict) -> str:
+    expire = datetime.utcnow() + timedelta(days=7)
+    to_encode = {
+        **data,
+        "exp": expire,
+        "type": "refresh",
+    }
+    return jwt.encode(
+        to_encode, settings.SECRET_KEY, algorithm=settings.ALGORITHM
+    )
 
 @router.post("/login", response_model=Token)
-def login(user: UserLogin, db: Session = Depends(get_db)):
+def login(
+    user: UserLogin,
+    db: Session = Depends(get_db),
+):
     db_user = db.query(User).filter(User.email == user.email).first()
-    if not db_user or not verify_password(user.password, db_user.hashed_password):
+
+    if not db_user or not verify_password(
+        user.password, db_user.hashed_password
+    ):
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Invalid email or password"
+            detail="Invalid email or password",
         )
-    access_token = create_access_token(data={"sub": db_user.email, "role": db_user.role})
-    return {"access_token": access_token, "token_type": "bearer"}
+
+    access_token = create_access_token(
+        {"sub": db_user.email, "role": db_user.role}
+    )
+    refresh_token = create_refresh_token(
+        {"sub": db_user.email}
+    )
+
+    return {
+        "access_token": access_token,
+        "refresh_token": refresh_token,
+        "token_type": "bearer",
+    }
+
+
+@router.post("/refresh", response_model=Token)
+def refresh_token(
+    payload: dict,
+    db: Session = Depends(get_db),
+):
+    refresh_token = payload.get("refresh_token")
+    if not refresh_token:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Missing refresh token",
+        )
+
+    try:
+        jwt_payload = jwt.decode(
+            refresh_token,
+            settings.SECRET_KEY,
+            algorithms=[settings.ALGORITHM],
+        )
+
+        if jwt_payload.get("type") != "refresh":
+            raise HTTPException(
+                status_code=status.HTTP_401_UNAUTHORIZED,
+                detail="Invalid token type",
+            )
+
+        email: str | None = jwt_payload.get("sub")
+        if email is None:
+            raise HTTPException(
+                status_code=status.HTTP_401_UNAUTHORIZED,
+                detail="Invalid refresh token",
+            )
+
+    except JWTError:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Invalid refresh token",
+        )
+
+    user = db.query(User).filter(User.email == email).first()
+    if not user:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="User not found",
+        )
+
+    new_access_token = create_access_token(
+        {"sub": user.email, "role": user.role}
+    )
+
+    return {
+        "access_token": new_access_token,
+        "refresh_token": refresh_token,
+        "token_type": "bearer",
+    }
 
 @router.post("/register", response_model=UserCreate)
 def register(user: UserCreate, db: Session = Depends(get_db)):
