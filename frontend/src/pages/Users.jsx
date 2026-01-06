@@ -131,6 +131,10 @@ export default function Users() {
         <h2 className="dashboard-logo">Network Device Monitoring System</h2>
         <ul className="dashboard-menu">
           <li><Link to="/dashboard">Dashboard</Link></li>
+          {(currentUserRole === "admin" || currentUserRole === "operator") && (
+<li><Link to="/devices">Devices</Link></li>
+)}
+
           <li><Link to="/users">Users</Link></li>
           {currentUserRole === "admin" && <li><Link to="/auditlogs">Audit Logs</Link></li>}
           <li><Link to="/settings">Settings</Link></li>

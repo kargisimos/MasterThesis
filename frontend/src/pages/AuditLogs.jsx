@@ -71,6 +71,7 @@ export default function AuditLogs() {
         <h2 className="dashboard-logo">Network Device Monitoring System</h2>
         <ul className="dashboard-menu">
           <li><Link to="/dashboard">Dashboard</Link></li>
+          {userRole === "admin" || userRole === "operator" ? (<li><Link to="/devices">Devices</Link></li>) : null}
           {userRole === "admin" && <li><Link to="/users">Users</Link></li>}
           {userRole === "admin" && <li><Link to="/auditlogs">Audit Logs</Link></li>}
           <li><Link to="/settings">Settings</Link></li>
