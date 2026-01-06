@@ -9,6 +9,7 @@ from models.user import User
 from schemas.user import UserLogin, UserCreate, Token, ChangePasswordRequest
 from config import settings
 from fastapi.security import OAuth2PasswordBearer
+from services.auditlogger import log_action
 
 oauth2_scheme = OAuth2PasswordBearer(tokenUrl="/auth/login")
 pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
@@ -136,13 +137,21 @@ def refresh_token(
     }
 
 @router.post("/register", response_model=UserCreate)
-def register(user: UserCreate, db: Session = Depends(get_db)):
+def register(user: UserCreate, db: Session = Depends(get_db), token: str = Depends(oauth2_scheme)):
+
+    try:
+        payload_jwt = jwt.decode(token, settings.SECRET_KEY, algorithms=[settings.ALGORITHM])
+        current_user_email: str | None = payload_jwt.get("sub")
+        current_user_role: str | None = payload_jwt.get("role")
+        if current_user_email is None or current_user_role != "admin":
+            raise HTTPException(status_code=403, detail="Not authorized")
+    except JWTError:
+        raise HTTPException(status_code=401, detail="Invalid token")
+
     existing_user = db.query(User).filter(User.email == user.email).first()
     if existing_user:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Email already registered"
-        )
+        raise HTTPException(status_code=400, detail="Email already registered")
+
     hashed_password = get_password_hash(user.password)
     db_user = User(
         email=user.email,
@@ -154,7 +163,17 @@ def register(user: UserCreate, db: Session = Depends(get_db)):
     db.add(db_user)
     db.commit()
     db.refresh(db_user)
+
+    log_action(
+        db=db,
+        action="user_created",
+        actor_email=current_user_email,
+        target_type="user",
+        target_name=db_user.email
+    )
+
     return user
+
 
 
 @router.post("/change-password", status_code=status.HTTP_204_NO_CONTENT)
@@ -163,30 +182,30 @@ def change_password(
     db: Session = Depends(get_db),
     token: str = Depends(oauth2_scheme)
 ):
-    credentials_exception = HTTPException(
-        status_code=status.HTTP_401_UNAUTHORIZED,
-        detail="Could not validate credentials",
-        headers={"WWW-Authenticate": "Bearer"},
-    )
-
     try:
         payload_jwt = jwt.decode(token, settings.SECRET_KEY, algorithms=[settings.ALGORITHM])
-        email: str | None = payload_jwt.get("sub")
-        if email is None:
-            raise credentials_exception
+        current_user_email: str | None = payload_jwt.get("sub")
+        if current_user_email is None:
+            raise HTTPException(status_code=401, detail="Invalid token")
     except JWTError:
-        raise credentials_exception
+        raise HTTPException(status_code=401, detail="Invalid token")
 
-    user = db.query(User).filter(User.email == email).first()
+    user = db.query(User).filter(User.email == current_user_email).first()
     if not user:
-        raise credentials_exception
+        raise HTTPException(status_code=401, detail="User not found")
 
     if not verify_password(payload.current_password, user.hashed_password):
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Current password is incorrect"
-        )
+        raise HTTPException(status_code=400, detail="Current password is incorrect")
 
     user.hashed_password = get_password_hash(payload.new_password)
     db.commit()
+
+    log_action(
+        db=db,
+        action="password_changed",
+        actor_email=current_user_email,
+        target_type="user",
+        target_name=current_user_email
+    )
+
     return

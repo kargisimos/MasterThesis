@@ -8,6 +8,8 @@ from database import SessionLocal
 from models.user import User, UserRole
 from schemas.user import UserOut, UserUpdate
 from config import settings
+from services.auditlogger import log_action
+
 
 router = APIRouter(tags=["Users"])
 
@@ -107,6 +109,7 @@ def update_user(
             detail="Not enough permissions",
         )
 
+
     if user_update.full_name is not None:
         user.full_name = user_update.full_name
     if user_update.email is not None:
@@ -120,10 +123,20 @@ def update_user(
     db.add(user)
     db.commit()
     db.refresh(user)
+
+    log_action(
+        db=db,
+        action="user_updated",
+        actor_email=current_user.email,
+        target_type="user",
+        target_name=user.email
+    )
+
     return user
 
 
-@router.delete("/{user_id}", status_code = status.HTTP_204_NO_CONTENT)
+
+@router.delete("/{user_id}", status_code=status.HTTP_204_NO_CONTENT)
 def delete_user(
     user_id: int,
     current_user: User = Depends(get_current_user),
@@ -144,5 +157,15 @@ def delete_user(
 
     db.delete(user)
     db.commit()
+
+    log_action(
+        db=db,
+        action="user_deleted",
+        actor_email=current_user.email,
+        target_type="user",
+        target_name=user.email
+    )
+
     return
+
 

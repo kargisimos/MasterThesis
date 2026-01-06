@@ -1,6 +1,6 @@
 from fastapi import FastAPI
 from database import Base, engine, SessionLocal
-from api import health, auth, users
+from api import health, auth, users, auditlogs
 from api.bootstrap import create_default_admin
 import models.user
 from fastapi.middleware.cors import CORSMiddleware
@@ -35,3 +35,5 @@ app.add_middleware(
 app.include_router(health.router)
 app.include_router(auth.router, prefix="/auth")
 app.include_router(users.router, prefix="/users")
+app.include_router(auditlogs.router, prefix="/auditlogs")
+

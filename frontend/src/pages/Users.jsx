@@ -9,14 +9,12 @@ const PAGE_SIZE = 5;
 export default function Users() {
   const navigate = useNavigate();
   const accessToken = localStorage.getItem("access_token");
-  const refreshToken = localStorage.getItem("refresh_token");
 
   const [users, setUsers] = useState([]);
   const [editingUserId, setEditingUserId] = useState(null);
   const [formData, setFormData] = useState({});
   const [search, setSearch] = useState("");
   const [page, setPage] = useState(1);
-
   const [showAddForm, setShowAddForm] = useState(false);
   const [newUser, setNewUser] = useState({
     email: "",
@@ -47,8 +45,14 @@ export default function Users() {
   }, [accessToken, currentUserRole, navigate]);
 
   const fetchUsers = async () => {
-    const res = await api.get("/users/");
-    setUsers(res.data);
+    try {
+      const res = await api.get("/users/");
+      setUsers(res.data);
+    } catch {
+      localStorage.removeItem("access_token");
+      localStorage.removeItem("refresh_token");
+      navigate("/");
+    }
   };
 
   const startEdit = (user) => {
@@ -66,23 +70,14 @@ export default function Users() {
     setFormData({});
   };
 
-  const createUser = async (e) => {
-    e.preventDefault();
-    await api.post("/auth/register", newUser);
-    setShowAddForm(false);
-    setNewUser({
-      email: "",
-      full_name: "",
-      password: "",
-      role: "viewer",
-    });
-    fetchUsers();
-  };
-
   const saveEdit = async (userId) => {
-    await api.patch(`/users/${userId}`, formData);
-    await fetchUsers();
-    cancelEdit();
+    try {
+      await api.patch(`/users/${userId}`, formData);
+      await fetchUsers();
+      cancelEdit();
+    } catch {
+      alert("Failed to update user.");
+    }
   };
 
   const deleteUser = async (user) => {
@@ -91,8 +86,25 @@ export default function Users() {
       return;
     }
     if (!window.confirm("Delete this user?")) return;
-    await api.delete(`/users/${user.id}`);
-    setUsers(users.filter((u) => u.id !== user.id));
+
+    try {
+      await api.delete(`/users/${user.id}`);
+      setUsers(users.filter((u) => u.id !== user.id));
+    } catch {
+      alert("Failed to delete user.");
+    }
+  };
+
+  const createUser = async (e) => {
+    e.preventDefault();
+    try {
+      await api.post("/auth/register", newUser);
+      setShowAddForm(false);
+      setNewUser({ email: "", full_name: "", password: "", role: "viewer" });
+      await fetchUsers();
+    } catch {
+      alert("Failed to create user.");
+    }
   };
 
   const filteredUsers = users.filter(
@@ -107,6 +119,12 @@ export default function Users() {
     page * PAGE_SIZE
   );
 
+  const handleLogout = () => {
+    localStorage.removeItem("access_token");
+    localStorage.removeItem("refresh_token");
+    navigate("/");
+  };
+
   return (
     <div className="dashboard-container">
       <aside className="dashboard-sidebar">
@@ -114,16 +132,10 @@ export default function Users() {
         <ul className="dashboard-menu">
           <li><Link to="/dashboard">Dashboard</Link></li>
           <li><Link to="/users">Users</Link></li>
+          {currentUserRole === "admin" && <li><Link to="/auditlogs">Audit Logs</Link></li>}
           <li><Link to="/settings">Settings</Link></li>
           <li>
-            <button
-              className="logout-button"
-              onClick={() => {
-                localStorage.removeItem("access_token");
-                localStorage.removeItem("refresh_token");
-                navigate("/");
-              }}
-            >
+            <button className="logout-button" onClick={handleLogout}>
               Logout
             </button>
           </li>
@@ -144,33 +156,25 @@ export default function Users() {
               <input
                 placeholder="Email"
                 value={newUser.email}
-                onChange={(e) =>
-                  setNewUser({ ...newUser, email: e.target.value })
-                }
+                onChange={(e) => setNewUser({ ...newUser, email: e.target.value })}
                 required
               />
               <input
                 placeholder="Full Name"
                 value={newUser.full_name}
-                onChange={(e) =>
-                  setNewUser({ ...newUser, full_name: e.target.value })
-                }
+                onChange={(e) => setNewUser({ ...newUser, full_name: e.target.value })}
                 required
               />
               <input
                 type="password"
                 placeholder="Password"
                 value={newUser.password}
-                onChange={(e) =>
-                  setNewUser({ ...newUser, password: e.target.value })
-                }
+                onChange={(e) => setNewUser({ ...newUser, password: e.target.value })}
                 required
               />
               <select
                 value={newUser.role}
-                onChange={(e) =>
-                  setNewUser({ ...newUser, role: e.target.value })
-                }
+                onChange={(e) => setNewUser({ ...newUser, role: e.target.value })}
               >
                 {ROLES.map((r) => (
                   <option key={r} value={r}>{r}</option>
@@ -204,9 +208,7 @@ export default function Users() {
                     {editingUserId === user.id ? (
                       <input
                         value={formData.email}
-                        onChange={(e) =>
-                          setFormData({ ...formData, email: e.target.value })
-                        }
+                        onChange={(e) => setFormData({ ...formData, email: e.target.value })}
                       />
                     ) : (
                       user.email
@@ -216,9 +218,7 @@ export default function Users() {
                     {editingUserId === user.id ? (
                       <input
                         value={formData.full_name}
-                        onChange={(e) =>
-                          setFormData({ ...formData, full_name: e.target.value })
-                        }
+                        onChange={(e) => setFormData({ ...formData, full_name: e.target.value })}
                       />
                     ) : (
                       user.full_name
@@ -228,9 +228,7 @@ export default function Users() {
                     {editingUserId === user.id ? (
                       <select
                         value={formData.role}
-                        onChange={(e) =>
-                          setFormData({ ...formData, role: e.target.value })
-                        }
+                        onChange={(e) => setFormData({ ...formData, role: e.target.value })}
                       >
                         {ROLES.map((r) => (
                           <option key={r} value={r}>{r}</option>
@@ -245,9 +243,7 @@ export default function Users() {
                       <input
                         type="checkbox"
                         checked={formData.is_active}
-                        onChange={(e) =>
-                          setFormData({ ...formData, is_active: e.target.checked })
-                        }
+                        onChange={(e) => setFormData({ ...formData, is_active: e.target.checked })}
                       />
                     ) : (
                       user.is_active ? "Yes" : "No"
@@ -277,15 +273,9 @@ export default function Users() {
           </table>
 
           <div style={{ marginTop: "20px", textAlign: "center" }}>
-            <button disabled={page === 1} onClick={() => setPage(page - 1)}>
-              Prev
-            </button>
-            <span style={{ margin: "0 10px" }}>
-              Page {page} / {totalPages}
-            </span>
-            <button disabled={page === totalPages} onClick={() => setPage(page + 1)}>
-              Next
-            </button>
+            <button disabled={page === 1} onClick={() => setPage(page - 1)}>Prev</button>
+            <span style={{ margin: "0 10px" }}>Page {page} / {totalPages}</span>
+            <button disabled={page === totalPages} onClick={() => setPage(page + 1)}>Next</button>
           </div>
         </div>
       </main>

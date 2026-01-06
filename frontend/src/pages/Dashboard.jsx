@@ -1,11 +1,10 @@
 import React, { useEffect, useState } from "react";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, Link } from "react-router-dom";
 import "./Dashboard.css";
 
 export default function Dashboard() {
   const navigate = useNavigate();
   const accessToken = localStorage.getItem("access_token");
-  const refreshToken = localStorage.getItem("refresh_token");
   const [userRole, setUserRole] = useState(null);
 
   useEffect(() => {
@@ -16,7 +15,7 @@ export default function Dashboard() {
     try {
       const payload = JSON.parse(atob(accessToken.split(".")[1]));
       setUserRole(payload.role);
-    } catch (e) {
+    } catch {
       localStorage.removeItem("access_token");
       localStorage.removeItem("refresh_token");
       navigate("/");
@@ -34,9 +33,10 @@ export default function Dashboard() {
       <aside className="dashboard-sidebar">
         <h2 className="dashboard-logo">Network Device Monitoring System</h2>
         <ul className="dashboard-menu">
-          <li><a href="/dashboard">Dashboard</a></li>
-          {userRole === "admin" && <li><a href="/users">Users</a></li>}
-          <li><a href="/settings">Settings</a></li>
+          <li><Link to="/dashboard">Dashboard</Link></li>
+          {userRole === "admin" && <li><Link to="/users">Users</Link></li>}
+          {userRole === "admin" && <li><Link to="/auditlogs">Audit Logs</Link></li>}
+          <li><Link to="/settings">Settings</Link></li>
           <li>
             <button className="logout-button" onClick={handleLogout}>
               Logout

@@ -65,6 +65,12 @@ export default function Settings() {
     ? JSON.parse(atob(accessToken.split(".")[1]))
     : null;
 
+  const handleLogout = () => {
+    localStorage.removeItem("access_token");
+    localStorage.removeItem("refresh_token");
+    navigate("/");
+  };
+
   return (
     <div className="dashboard-container">
       <aside className="dashboard-sidebar">
@@ -72,16 +78,10 @@ export default function Settings() {
         <ul className="dashboard-menu">
           <li><Link to="/dashboard">Dashboard</Link></li>
           {userRole === "admin" && <li><Link to="/users">Users</Link></li>}
+          {userRole === "admin" && <li><Link to="/auditlogs">Audit Logs</Link></li>}
           <li><Link to="/settings">Settings</Link></li>
           <li>
-            <button
-              className="logout-button"
-              onClick={() => {
-                localStorage.removeItem("access_token");
-                localStorage.removeItem("refresh_token");
-                navigate("/");
-              }}
-            >
+            <button className="logout-button" onClick={handleLogout}>
               Logout
             </button>
           </li>
