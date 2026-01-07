@@ -8,6 +8,7 @@ export default function AuditLogs() {
   const accessToken = localStorage.getItem("access_token");
 
   const [logs, setLogs] = useState([]);
+  const [search, setSearch] = useState("");
   const [page, setPage] = useState(1);
   const [pageSize] = useState(20);
   const [totalPages, setTotalPages] = useState(1);
@@ -25,14 +26,13 @@ export default function AuditLogs() {
       setUserRole(payload.role);
 
       if (payload.role !== "admin") {
-        navigate("/dashboard"); // only admins can see logs
+        navigate("/dashboard");
         return;
       }
     } catch {
       localStorage.removeItem("access_token");
       localStorage.removeItem("refresh_token");
       navigate("/");
-      return;
     }
   }, [accessToken, navigate]);
 
@@ -49,7 +49,7 @@ export default function AuditLogs() {
         params: { page: pageNumber, page_size: pageSize },
       });
       setLogs(res.data.logs);
-      setTotalPages(res.data.total_pages);
+      setTotalPages(res.data.total_pages || 1);
     } catch {
       localStorage.removeItem("access_token");
       localStorage.removeItem("refresh_token");
@@ -65,13 +65,24 @@ export default function AuditLogs() {
     navigate("/");
   };
 
+  const filteredLogs = logs.filter(
+    (log) =>
+      log.actor_email.toLowerCase().includes(search.toLowerCase()) ||
+      log.action.toLowerCase().includes(search.toLowerCase()) ||
+      (log.target_name || "").toLowerCase().includes(search.toLowerCase())
+  );
+
+  const safeTotalPages = totalPages === 0 ? 1 : totalPages;
+
   return (
     <div className="dashboard-container">
       <aside className="dashboard-sidebar">
         <h2 className="dashboard-logo">Network Device Monitoring System</h2>
         <ul className="dashboard-menu">
           <li><Link to="/dashboard">Dashboard</Link></li>
-          {userRole === "admin" || userRole === "operator" ? (<li><Link to="/devices">Devices</Link></li>) : null}
+          {(userRole === "admin" || userRole === "operator") && (
+            <li><Link to="/devices">Devices</Link></li>
+          )}
           {userRole === "admin" && <li><Link to="/users">Users</Link></li>}
           {userRole === "admin" && <li><Link to="/auditlogs">Audit Logs</Link></li>}
           <li><Link to="/settings">Settings</Link></li>
@@ -87,39 +98,63 @@ export default function AuditLogs() {
         <div className="dashboard-card">
           <h1>Audit Logs</h1>
 
+          <input
+            placeholder="Search logs..."
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            style={{ marginBottom: "15px", width: "100%", padding: "8px" }}
+          />
+
           {loading ? (
             <p>Loading logs...</p>
-          ) : logs.length === 0 ? (
+          ) : filteredLogs.length === 0 ? (
             <p>No logs found.</p>
           ) : (
-            <table style={{ width: "100%", borderCollapse: "collapse" }}>
+            <table className="data-table">
               <thead>
                 <tr>
-                  <th style={{ textAlign: "left", padding: "8px", borderBottom: "1px solid #ccc" }}>Timestamp</th>
-                  <th style={{ textAlign: "left", padding: "8px", borderBottom: "1px solid #ccc" }}>Actor</th>
-                  <th style={{ textAlign: "left", padding: "8px", borderBottom: "1px solid #ccc" }}>Action</th>
-                  <th style={{ textAlign: "left", padding: "8px", borderBottom: "1px solid #ccc" }}>Target</th>
+                  <th>Timestamp</th>
+                  <th>Actor</th>
+                  <th>Action</th>
+                  <th>Target</th>
                 </tr>
               </thead>
               <tbody>
-                {logs.map((log) => (
+                {filteredLogs.map((log) => (
                   <tr key={log.id}>
-                    <td style={{ padding: "8px", borderBottom: "1px solid #eee" }}>
+                    <td className="mono">
                       {new Date(log.timestamp).toLocaleString()}
                     </td>
-                    <td style={{ padding: "8px", borderBottom: "1px solid #eee" }}>{log.actor_email}</td>
-                    <td style={{ padding: "8px", borderBottom: "1px solid #eee" }}>{log.action}</td>
-                    <td style={{ padding: "8px", borderBottom: "1px solid #eee" }}>{log.target_name || "-"}</td>
+                    <td>{log.actor_email}</td>
+                    <td>{log.action}</td>
+                    <td>{log.target_name || "-"}</td>
                   </tr>
                 ))}
               </tbody>
             </table>
           )}
 
-          <div style={{ marginTop: "20px", display: "flex", justifyContent: "space-between" }}>
-            <button disabled={page <= 1} onClick={() => setPage(page - 1)}>Previous</button>
-            <span>Page {page} of {totalPages}</span>
-            <button disabled={page >= totalPages} onClick={() => setPage(page + 1)}>Next</button>
+          <div
+            style={{
+              marginTop: "20px",
+              display: "flex",
+              justifyContent: "center",
+              alignItems: "center",
+              gap: "10px",
+            }}
+          >
+            <button disabled={page <= 1} onClick={() => setPage(page - 1)}>
+              Prev
+            </button>
+            <span>
+              Page {page} / {safeTotalPages}
+            </span>
+            <button
+              disabled={page >= safeTotalPages}
+              onClick={() => setPage(page + 1)}
+            >
+              Next
+            </button>
           </div>
         </div>
       </main>

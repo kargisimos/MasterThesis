@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import api from "../api/client";
 import "./Login.css";
@@ -7,20 +7,33 @@ import ReactLogo from "../assets/react.svg";
 export default function Login() {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
-  const [message, setMessage] = useState("");
+  const [error, setError] = useState("");
 
   const navigate = useNavigate();
 
+  useEffect(() => {
+    const savedError = sessionStorage.getItem("login_error");
+    if (savedError) {
+      setError(savedError);
+    }
+  }, []);
+
   const handleSubmit = async (e) => {
     e.preventDefault();
+
+    setError("");
+    sessionStorage.removeItem("login_error");
+
     try {
       const res = await api.post("/auth/login", { email, password });
       localStorage.setItem("access_token", res.data.access_token);
       localStorage.setItem("refresh_token", res.data.refresh_token);
-      setMessage("Login successful!");
+      sessionStorage.removeItem("login_error");
       navigate("/dashboard");
-    } catch (err) {
-      setMessage("Invalid username or password.");
+    } catch {
+      const msg = "Invalid username or password.";
+      setError(msg);
+      sessionStorage.setItem("login_error", msg);
     }
   };
 
@@ -28,9 +41,11 @@ export default function Login() {
     <div className="login-container">
       <div className="login-card">
         <img src={ReactLogo} alt="Logo" className="login-logo" />
+
         <h2 className="login-title">
           Network Device Monitoring and Management System
         </h2>
+
         <form className="login-form" onSubmit={handleSubmit}>
           <input
             type="email"
@@ -39,6 +54,7 @@ export default function Login() {
             onChange={(e) => setEmail(e.target.value)}
             required
           />
+
           <input
             type="password"
             placeholder="Password"
@@ -46,9 +62,25 @@ export default function Login() {
             onChange={(e) => setPassword(e.target.value)}
             required
           />
+
           <button type="submit">Login</button>
         </form>
-        {message && <p className="login-message">{message}</p>}
+
+        {error && (
+          <div
+            style={{
+              marginTop: "16px",
+              padding: "10px",
+              borderRadius: "6px",
+              backgroundColor: "#fee2e2",
+              color: "#b91c1c",
+              fontWeight: 500,
+              textAlign: "center",
+            }}
+          >
+            {error}
+          </div>
+        )}
       </div>
     </div>
   );
