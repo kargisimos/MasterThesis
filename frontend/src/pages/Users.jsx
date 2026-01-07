@@ -146,6 +146,14 @@ export default function Users() {
           />
 
           <table className="data-table">
+            <colgroup>
+              <col style={{ width: "35%" }} /> {/* Email */}
+              <col style={{ width: "35%" }} /> {/* Full Name */}
+              <col style={{ width: "10%" }} /> {/* Role */}
+              <col style={{ width: "8%" }} />  {/* Active */}
+              <col style={{ width: "12%" }} /> {/* Actions */}
+            </colgroup>
+
             <thead>
               <tr>
                 <th>Email</th>
@@ -155,6 +163,7 @@ export default function Users() {
                 <th>Actions</th>
               </tr>
             </thead>
+
             <tbody>
               {paginatedUsers.map((user) => (
                 <tr key={user.id}>
@@ -163,7 +172,9 @@ export default function Users() {
                   <td>{user.role}</td>
                   <td>{user.is_active ? "Yes" : "No"}</td>
                   <td>
-                    <button onClick={() => setEditingUser({ ...user })}>Edit</button>
+                    <button onClick={() => setEditingUser({ ...user })}>
+                      Edit
+                    </button>
                     <button className="danger" onClick={() => deleteUser(user)}>
                       Delete
                     </button>
@@ -174,9 +185,15 @@ export default function Users() {
           </table>
 
           <div style={{ marginTop: "20px", textAlign: "center" }}>
-            <button disabled={page === 1} onClick={() => setPage(page - 1)}>Prev</button>
-            <span style={{ margin: "0 10px" }}>Page {page} / {totalPages}</span>
-            <button disabled={page === totalPages} onClick={() => setPage(page + 1)}>Next</button>
+            <button disabled={page === 1} onClick={() => setPage(page - 1)}>
+              Prev
+            </button>
+            <span style={{ margin: "0 10px" }}>
+              Page {page} / {totalPages}
+            </span>
+            <button disabled={page === totalPages} onClick={() => setPage(page + 1)}>
+              Next
+            </button>
           </div>
         </div>
       </main>
@@ -190,31 +207,41 @@ export default function Users() {
                 placeholder="Email"
                 required
                 value={newUser.email}
-                onChange={(e) => setNewUser({ ...newUser, email: e.target.value })}
+                onChange={(e) =>
+                  setNewUser({ ...newUser, email: e.target.value })
+                }
               />
               <input
                 placeholder="Full Name"
                 required
                 value={newUser.full_name}
-                onChange={(e) => setNewUser({ ...newUser, full_name: e.target.value })}
+                onChange={(e) =>
+                  setNewUser({ ...newUser, full_name: e.target.value })
+                }
               />
               <input
                 type="password"
                 placeholder="Password"
                 required
                 value={newUser.password}
-                onChange={(e) => setNewUser({ ...newUser, password: e.target.value })}
+                onChange={(e) =>
+                  setNewUser({ ...newUser, password: e.target.value })
+                }
               />
               <select
                 value={newUser.role}
-                onChange={(e) => setNewUser({ ...newUser, role: e.target.value })}
+                onChange={(e) =>
+                  setNewUser({ ...newUser, role: e.target.value })
+                }
               >
                 {ROLES.map((r) => (
                   <option key={r}>{r}</option>
                 ))}
               </select>
               <button type="submit">Create</button>
-              <button type="button" onClick={() => setShowAddModal(false)}>Cancel</button>
+              <button type="button" onClick={() => setShowAddModal(false)}>
+                Cancel
+              </button>
             </form>
           </div>
         </div>
@@ -224,18 +251,32 @@ export default function Users() {
         <div className="modal-overlay" onClick={() => setEditingUser(null)}>
           <div className="modal" onClick={(e) => e.stopPropagation()}>
             <h2>Edit User</h2>
-            <form onSubmit={(e) => { e.preventDefault(); saveEdit(); }}>
+            <form
+              onSubmit={(e) => {
+                e.preventDefault();
+                saveEdit();
+              }}
+            >
               <input
                 value={editingUser.email}
-                onChange={(e) => setEditingUser({ ...editingUser, email: e.target.value })}
+                onChange={(e) =>
+                  setEditingUser({ ...editingUser, email: e.target.value })
+                }
               />
               <input
                 value={editingUser.full_name}
-                onChange={(e) => setEditingUser({ ...editingUser, full_name: e.target.value })}
+                onChange={(e) =>
+                  setEditingUser({
+                    ...editingUser,
+                    full_name: e.target.value,
+                  })
+                }
               />
               <select
                 value={editingUser.role}
-                onChange={(e) => setEditingUser({ ...editingUser, role: e.target.value })}
+                onChange={(e) =>
+                  setEditingUser({ ...editingUser, role: e.target.value })
+                }
               >
                 {ROLES.map((r) => (
                   <option key={r}>{r}</option>
@@ -244,14 +285,19 @@ export default function Users() {
               <select
                 value={editingUser.is_active}
                 onChange={(e) =>
-                  setEditingUser({ ...editingUser, is_active: e.target.value === "true" })
+                  setEditingUser({
+                    ...editingUser,
+                    is_active: e.target.value === "true",
+                  })
                 }
               >
                 <option value="true">Active</option>
                 <option value="false">Inactive</option>
               </select>
               <button type="submit">Save</button>
-              <button type="button" onClick={() => setEditingUser(null)}>Cancel</button>
+              <button type="button" onClick={() => setEditingUser(null)}>
+                Cancel
+              </button>
             </form>
           </div>
         </div>
