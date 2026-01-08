@@ -18,6 +18,8 @@ class Settings(BaseSettings):
     DEFAULT_ADMIN_PASSWORD: str
     DEFAULT_ADMIN_FULL_NAME: str
 
+    DEVICE_CREDENTIAL_SECRET_KEY: str
+
 
     class Config:
         env_file = ".env"
