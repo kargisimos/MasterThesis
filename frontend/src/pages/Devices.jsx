@@ -1,14 +1,12 @@
 import React, { useEffect, useState } from "react";
-import { useNavigate, Link } from "react-router-dom";
-import api from "../api/client";
-import "./Dashboard.css";
+import DeviceService from "../services/deviceService";
+import { useAuth } from "../hooks/useAuth";
 
 const DEVICE_TYPES = ["Router", "Switch", "Server", "IoT Device"];
 const PAGE_SIZE = 10;
 
 export default function Devices() {
-  const navigate = useNavigate();
-  const accessToken = localStorage.getItem("access_token");
+  const { userRole } = useAuth();
 
   const [devices, setDevices] = useState([]);
   const [editingDevice, setEditingDevice] = useState(null);
@@ -16,6 +14,7 @@ export default function Devices() {
   const [search, setSearch] = useState("");
   const [page, setPage] = useState(1);
   const [showAddModal, setShowAddModal] = useState(false);
+  
   const [newDevice, setNewDevice] = useState({
     name: "",
     ip_address: "",
@@ -31,40 +30,24 @@ export default function Devices() {
     community_string: "",
   });
 
-  let userRole = null;
-  if (accessToken) {
-    try {
-      const payload = JSON.parse(atob(accessToken.split(".")[1]));
-      userRole = payload.role;
-    } catch {
-      localStorage.removeItem("access_token");
-      localStorage.removeItem("refresh_token");
-      navigate("/");
-    }
-  }
-
   useEffect(() => {
-    if (!accessToken) return navigate("/");
-    if (userRole === "viewer") return navigate("/dashboard");
     fetchDevices();
-  }, [accessToken, userRole, navigate]);
+  }, []);
 
   const fetchDevices = async () => {
     try {
-      const res = await api.get("/devices/");
-      setDevices(res.data);
+      const data = await DeviceService.getAll();
+      setDevices(data);
       setPage(1);
-    } catch {
-      localStorage.removeItem("access_token");
-      localStorage.removeItem("refresh_token");
-      navigate("/");
+    } catch (error) {
+      console.error("Failed to fetch devices", error);
     }
   };
 
   const createDevice = async (e) => {
     e.preventDefault();
     try {
-      await api.post("/devices/", newDevice);
+      await DeviceService.create(newDevice);
       setShowAddModal(false);
       setNewDevice({ name: "", ip_address: "", type: "Router", location: "", notes: "" });
       fetchDevices();
@@ -75,7 +58,7 @@ export default function Devices() {
 
   const saveEdit = async () => {
     try {
-      await api.patch(`/devices/${editingDevice.id}`, editingDevice);
+      await DeviceService.update(editingDevice.id, editingDevice);
       setEditingDevice(null);
       fetchDevices();
     } catch {
@@ -86,7 +69,7 @@ export default function Devices() {
   const deleteDevice = async (device) => {
     if (!window.confirm(`Delete device "${device.name}"?`)) return;
     try {
-      await api.delete(`/devices/${device.id}`);
+      await DeviceService.delete(device.id);
       setDevices(devices.filter((d) => d.id !== device.id));
     } catch {
       alert("Failed to delete device.");
@@ -106,7 +89,7 @@ export default function Devices() {
           ? { type: "ssh", username: credData.username, password: credData.password }
           : { type: "snmp", community_string: credData.community_string };
 
-      await api.post(`/devices/${credentialsDevice.id}/credentials`, payload);
+      await DeviceService.saveCredentials(credentialsDevice.id, payload);
       setCredentialsDevice(null);
     } catch {
       alert("Failed to save credentials.");
@@ -127,80 +110,58 @@ export default function Devices() {
     page * PAGE_SIZE
   );
 
-  const handleLogout = () => {
-    localStorage.removeItem("access_token");
-    localStorage.removeItem("refresh_token");
-    navigate("/");
-  };
-
   return (
-    <div className="dashboard-container">
-      <aside className="dashboard-sidebar">
-        <h2 className="dashboard-logo">Network Device Monitoring System</h2>
-        <ul className="dashboard-menu">
-          <li><Link to="/dashboard">Dashboard</Link></li>
-          {(userRole === "admin" || userRole === "operator") && <li><Link to="/devices">Devices</Link></li>}
-          {userRole === "admin" && <li><Link to="/users">Users</Link></li>}
-          {userRole === "admin" && <li><Link to="/auditlogs">Audit Logs</Link></li>}
-          <li><Link to="/settings">Settings</Link></li>
-          <li><button className="logout-button" onClick={handleLogout}>Logout</button></li>
-        </ul>
-      </aside>
+    <div className="dashboard-card">
+      <h1>Devices</h1>
+      <button className="add-device-btn" onClick={() => setShowAddModal(true)}>
+        Add Device
+      </button>
 
-      <main className="dashboard-main">
-        <div className="dashboard-card">
-          <h1>Devices</h1>
-          <button className="add-device-btn" onClick={() => setShowAddModal(true)}>
-            Add Device
-          </button>
+      <input
+        placeholder="Search devices..."
+        value={search}
+        onChange={(e) => setSearch(e.target.value)}
+        style={{ margin: "15px 0", width: "100%", padding: "8px" }}
+      />
 
-          <input
-            placeholder="Search devices..."
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-            style={{ margin: "15px 0", width: "100%", padding: "8px" }}
-          />
+      <table className="data-table">
+        <thead>
+          <tr>
+            <th>Name</th>
+            <th>IP Address</th>
+            <th>Type</th>
+            <th>Location</th>
+            <th>Notes</th>
+            <th>Actions</th>
+          </tr>
+        </thead>
+        <tbody>
+          {paginatedDevices.map((device) => (
+            <tr key={device.id}>
+              <td>{device.name}</td>
+              <td>{device.ip_address}</td>
+              <td>{device.type}</td>
+              <td>{device.location || "-"}</td>
+              <td className="notes" title={device.notes || "-"}>
+                {device.notes || "-"}
+              </td>
+              <td>
+                <button onClick={() => setEditingDevice({ ...device })}>Edit</button>
+                <button className="danger" onClick={() => deleteDevice(device)}>
+                  Delete
+                </button>
+                <button onClick={() => openCredentialsModal(device)}>Credentials</button>
+              </td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
 
-          <table className="data-table">
-            <thead>
-              <tr>
-                <th>Name</th>
-                <th>IP Address</th>
-                <th>Type</th>
-                <th>Location</th>
-                <th>Notes</th>
-                <th>Actions</th>
-              </tr>
-            </thead>
-            <tbody>
-              {paginatedDevices.map((device) => (
-                <tr key={device.id}>
-                  <td>{device.name}</td>
-                  <td>{device.ip_address}</td>
-                  <td>{device.type}</td>
-                  <td>{device.location || "-"}</td>
-                  <td className="notes" title={device.notes || "-"}>
-                    {device.notes || "-"}
-                  </td>
-                  <td>
-                    <button onClick={() => setEditingDevice({ ...device })}>Edit</button>
-                    <button className="danger" onClick={() => deleteDevice(device)}>
-                      Delete
-                    </button>
-                    <button onClick={() => openCredentialsModal(device)}>Credentials</button>
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-
-          <div style={{ marginTop: "20px", textAlign: "center" }}>
-            <button disabled={page === 1} onClick={() => setPage(page - 1)}>Prev</button>
-            <span style={{ margin: "0 10px" }}>Page {page} / {totalPages}</span>
-            <button disabled={page === totalPages} onClick={() => setPage(page + 1)}>Next</button>
-          </div>
-        </div>
-      </main>
+      <div style={{ marginTop: "20px", textAlign: "center" }}>
+        <button disabled={page === 1} onClick={() => setPage(page - 1)}>Prev</button>
+        <span style={{ margin: "0 10px" }}>Page {page} / {totalPages}</span>
+        <button disabled={page === totalPages} onClick={() => setPage(page + 1)}>Next</button>
+      </div>
 
       {showAddModal && (
         <div className="modal-overlay" onClick={() => setShowAddModal(false)}>

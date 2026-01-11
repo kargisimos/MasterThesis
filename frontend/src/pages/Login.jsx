@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
-import api from "../api/client";
+import AuthService from "../services/authService";
 import "./Login.css";
 import ReactLogo from "../assets/react.svg";
 
@@ -25,9 +25,9 @@ export default function Login() {
     sessionStorage.removeItem("login_error");
 
     try {
-      const res = await api.post("/auth/login", { email, password });
-      localStorage.setItem("access_token", res.data.access_token);
-      localStorage.setItem("refresh_token", res.data.refresh_token);
+      const data = await AuthService.login(email, password);
+      localStorage.setItem("access_token", data.access_token);
+      localStorage.setItem("refresh_token", data.refresh_token);
       sessionStorage.removeItem("login_error");
       navigate("/dashboard");
     } catch {

@@ -1,15 +1,13 @@
 import React, { useEffect, useState } from "react";
-import { useNavigate, Link } from "react-router-dom";
-import api from "../api/client";
-import "./Dashboard.css";
+import api from "../services/api";
+import { useAuth } from "../hooks/useAuth";
 
 const ROLES = ["admin", "operator", "viewer"];
 const PAGE_SIZE = 10;
 
 export default function Users() {
-  const navigate = useNavigate();
-  const accessToken = localStorage.getItem("access_token");
-
+  const { userRole, logout } = useAuth();
+  
   const [users, setUsers] = useState([]);
   const [editingUser, setEditingUser] = useState(null);
   const [search, setSearch] = useState("");
@@ -23,25 +21,19 @@ export default function Users() {
   });
 
   let currentUserEmail = null;
-  let currentUserRole = null;
-
-  if (accessToken) {
-    try {
-      const payload = JSON.parse(atob(accessToken.split(".")[1]));
-      currentUserEmail = payload.sub;
-      currentUserRole = payload.role;
-    } catch {
-      localStorage.removeItem("access_token");
-      localStorage.removeItem("refresh_token");
-      navigate("/");
-    }
+  const token = localStorage.getItem("access_token");
+  if (token) {
+      try {
+          const payload = JSON.parse(atob(token.split(".")[1]));
+          currentUserEmail = payload.sub;
+      } catch (e) {
+         
+      }
   }
 
   useEffect(() => {
-    if (!accessToken) return navigate("/");
-    if (currentUserRole !== "admin") return navigate("/dashboard");
     fetchUsers();
-  }, [accessToken, currentUserRole, navigate]);
+  }, []);
 
   const fetchUsers = async () => {
     try {
@@ -49,9 +41,6 @@ export default function Users() {
       setUsers(res.data);
       setPage(1);
     } catch {
-      localStorage.removeItem("access_token");
-      localStorage.removeItem("refresh_token");
-      navigate("/");
     }
   };
 
@@ -104,99 +93,71 @@ export default function Users() {
     page * PAGE_SIZE
   );
 
-  const handleLogout = () => {
-    localStorage.removeItem("access_token");
-    localStorage.removeItem("refresh_token");
-    navigate("/");
-  };
-
   return (
-    <div className="dashboard-container">
-      <aside className="dashboard-sidebar">
-        <h2 className="dashboard-logo">Network Device Monitoring System</h2>
-        <ul className="dashboard-menu">
-          <li><Link to="/dashboard">Dashboard</Link></li>
-          {(currentUserRole === "admin" || currentUserRole === "operator") && (
-            <li><Link to="/devices">Devices</Link></li>
-          )}
-          <li><Link to="/users">Users</Link></li>
-          {currentUserRole === "admin" && <li><Link to="/auditlogs">Audit Logs</Link></li>}
-          <li><Link to="/settings">Settings</Link></li>
-          <li>
-            <button className="logout-button" onClick={handleLogout}>
-              Logout
-            </button>
-          </li>
-        </ul>
-      </aside>
+    <div className="dashboard-card">
+      <h1>Users</h1>
 
-      <main className="dashboard-main">
-        <div className="dashboard-card">
-          <h1>Users</h1>
+      <button className="add-device-btn" onClick={() => setShowAddModal(true)}>
+        Add User
+      </button>
 
-          <button className="add-device-btn" onClick={() => setShowAddModal(true)}>
-            Add User
-          </button>
+      <input
+        placeholder="Search users..."
+        value={search}
+        onChange={(e) => setSearch(e.target.value)}
+        style={{ margin: "15px 0", width: "100%", padding: "8px" }}
+      />
 
-          <input
-            placeholder="Search users..."
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-            style={{ margin: "15px 0", width: "100%", padding: "8px" }}
-          />
+      <table className="data-table">
+        <colgroup>
+          <col style={{ width: "35%" }} />
+          <col style={{ width: "35%" }} />
+          <col style={{ width: "10%" }} />
+          <col style={{ width: "8%" }} />
+          <col style={{ width: "12%" }} />
+        </colgroup>
 
-          <table className="data-table">
-            <colgroup>
-              <col style={{ width: "35%" }} /> {/* Email */}
-              <col style={{ width: "35%" }} /> {/* Full Name */}
-              <col style={{ width: "10%" }} /> {/* Role */}
-              <col style={{ width: "8%" }} />  {/* Active */}
-              <col style={{ width: "12%" }} /> {/* Actions */}
-            </colgroup>
+        <thead>
+          <tr>
+            <th>Email</th>
+            <th>Full Name</th>
+            <th>Role</th>
+            <th>Active</th>
+            <th>Actions</th>
+          </tr>
+        </thead>
 
-            <thead>
-              <tr>
-                <th>Email</th>
-                <th>Full Name</th>
-                <th>Role</th>
-                <th>Active</th>
-                <th>Actions</th>
-              </tr>
-            </thead>
+        <tbody>
+          {paginatedUsers.map((user) => (
+            <tr key={user.id}>
+              <td>{user.email}</td>
+              <td>{user.full_name}</td>
+              <td>{user.role}</td>
+              <td>{user.is_active ? "Yes" : "No"}</td>
+              <td>
+                <button onClick={() => setEditingUser({ ...user })}>
+                  Edit
+                </button>
+                <button className="danger" onClick={() => deleteUser(user)}>
+                  Delete
+                </button>
+              </td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
 
-            <tbody>
-              {paginatedUsers.map((user) => (
-                <tr key={user.id}>
-                  <td>{user.email}</td>
-                  <td>{user.full_name}</td>
-                  <td>{user.role}</td>
-                  <td>{user.is_active ? "Yes" : "No"}</td>
-                  <td>
-                    <button onClick={() => setEditingUser({ ...user })}>
-                      Edit
-                    </button>
-                    <button className="danger" onClick={() => deleteUser(user)}>
-                      Delete
-                    </button>
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-
-          <div style={{ marginTop: "20px", textAlign: "center" }}>
-            <button disabled={page === 1} onClick={() => setPage(page - 1)}>
-              Prev
-            </button>
-            <span style={{ margin: "0 10px" }}>
-              Page {page} / {totalPages}
-            </span>
-            <button disabled={page === totalPages} onClick={() => setPage(page + 1)}>
-              Next
-            </button>
-          </div>
-        </div>
-      </main>
+      <div style={{ marginTop: "20px", textAlign: "center" }}>
+        <button disabled={page === 1} onClick={() => setPage(page - 1)}>
+          Prev
+        </button>
+        <span style={{ margin: "0 10px" }}>
+          Page {page} / {totalPages}
+        </span>
+        <button disabled={page === totalPages} onClick={() => setPage(page + 1)}>
+          Next
+        </button>
+      </div>
 
       {showAddModal && (
         <div className="modal-overlay" onClick={() => setShowAddModal(false)}>
