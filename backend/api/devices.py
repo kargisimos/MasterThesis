@@ -6,8 +6,8 @@ from models.device import Device, DeviceCredential
 from schemas.device import DeviceCreate, DeviceOut, DeviceUpdate, CredentialCreate, CredentialOut
 from services.auditlogger import log_action
 from services.encryptor import encrypt_value
-from api.auth import get_db
-from api.users import get_current_user
+from services.db import get_db
+from services.security import get_current_user
 
 router = APIRouter(tags=["Devices"])
 

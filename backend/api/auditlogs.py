@@ -3,20 +3,13 @@ from sqlalchemy.orm import Session
 from typing import List
 import math
 
-from database import SessionLocal
+from services.db import get_db
 from models.auditlog import AuditLog
 from schemas.auditlog import AuditLogOut, AuditLogPage
-from api.users import get_current_user
+from services.security import get_current_user
 from models.user import User, UserRole
 
 router = APIRouter(tags = ["Audit Logs"])
-
-def get_db():
-    db = SessionLocal()
-    try:
-        yield db
-    finally:
-        db.close()
 
 @router.get("/", response_model=AuditLogPage)
 def get_audit_logs(

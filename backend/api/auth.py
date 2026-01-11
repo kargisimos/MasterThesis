@@ -2,55 +2,24 @@ from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session
 from datetime import datetime, timedelta
 from jose import JWTError, jwt
-from passlib.context import CryptContext
 
-from database import SessionLocal
 from models.user import User
 from schemas.user import UserLogin, UserCreate, Token, ChangePasswordRequest
 from config import settings
-from fastapi.security import OAuth2PasswordBearer
 from services.auditlogger import log_action
-
-oauth2_scheme = OAuth2PasswordBearer(tokenUrl="/auth/login")
-pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
+from services.db import get_db
+from services.security import (
+    verify_password,
+    get_password_hash,
+    create_access_token,
+    create_refresh_token,
+    oauth2_scheme,
+)
 
 router = APIRouter(
     tags=["Auth"]
 )
 
-def get_db():
-    db = SessionLocal()
-    try:
-        yield db
-    finally:
-        db.close()
-
-def verify_password(plain_password, hashed_password):
-    return pwd_context.verify(plain_password, hashed_password)
-
-def get_password_hash(password):
-    return pwd_context.hash(password)
-
-def create_access_token(data: dict) -> str:
-    expire = datetime.utcnow() + timedelta(
-        minutes=settings.ACCESS_TOKEN_EXPIRE_MINUTES
-    )
-    to_encode = {**data, "exp": expire}
-    return jwt.encode(
-        to_encode, settings.SECRET_KEY, algorithm=settings.ALGORITHM
-    )
-
-
-def create_refresh_token(data: dict) -> str:
-    expire = datetime.utcnow() + timedelta(days=7)
-    to_encode = {
-        **data,
-        "exp": expire,
-        "type": "refresh",
-    }
-    return jwt.encode(
-        to_encode, settings.SECRET_KEY, algorithm=settings.ALGORITHM
-    )
 
 @router.post("/login", response_model=Token)
 def login(
