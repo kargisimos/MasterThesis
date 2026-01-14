@@ -1,6 +1,6 @@
 from pydantic import BaseModel, Field, IPvAnyAddress
 from typing import Optional, Literal
-
+from datetime import datetime
 
 DeviceType = Literal["Router", "Switch", "Server", "IoT Device"]
 
@@ -29,11 +29,34 @@ class DeviceUpdate(BaseModel):
 
 class DeviceOut(DeviceBase):
     id: int
+    
+    last_status: str
+    last_latency: Optional[float] = None
+    last_cpu: Optional[float] = None
+    last_memory: Optional[float] = None
+    last_traffic: Optional[float] = None
+    last_polled: Optional[datetime] = None
 
     class Config:
         orm_mode = True
 
+class MetricOut(BaseModel):
+    id: int
+    device_id: int
+    timestamp: datetime
+    cpu_usage: Optional[float] = None
+    memory_usage: Optional[float] = None
+    traffic: Optional[float] = None
+    latency: Optional[float] = None
 
+    class Config:
+        orm_mode = True
+class TrendOut(BaseModel):
+    timestamp: datetime
+    avg_cpu: float
+    avg_memory: float
+    avg_latency: float
+    avg_traffic: float
 
 CredentialType = Literal["ssh", "snmp"]
 

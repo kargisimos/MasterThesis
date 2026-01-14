@@ -24,6 +24,16 @@ const DeviceService = {
         const response = await api.post(`/devices/${id}/credentials`, credentials);
         return response.data;
     },
+
+    getHistory: async (id, timeframe = "24h") => {
+        const response = await api.get(`/devices/${id}/history?range=${timeframe}`);
+        return response.data;
+    },
+
+    getTrends: async (timeframe = "24h") => {
+        const response = await api.get(`/devices/stats/trends?range=${timeframe}`);
+        return response.data;
+    },
 };
 
 export default DeviceService;
