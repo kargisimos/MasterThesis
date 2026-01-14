@@ -83,7 +83,7 @@ export default function Settings() {
 
         <section style={{ marginBottom: "30px" }}>
         <h2>Security</h2>
-        <button onClick={() => setShowPasswordModal(true)}>
+        <button className="add-device-btn" onClick={() => setShowPasswordModal(true)}>
             Change Password
         </button>
         </section>
