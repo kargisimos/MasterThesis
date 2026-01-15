@@ -30,9 +30,16 @@ export default function Devices() {
     community_string: "",
   });
 
+  const [message, setMessage] = useState(null);
+
   useEffect(() => {
     fetchDevices();
   }, []);
+
+  const showSuccess = (msg) => {
+    setMessage(msg);
+    setTimeout(() => setMessage(null), 3000);
+  };
 
   const fetchDevices = async () => {
     try {
@@ -51,6 +58,7 @@ export default function Devices() {
       setShowAddModal(false);
       setNewDevice({ name: "", ip_address: "", type: "Router", location: "", notes: "" });
       fetchDevices();
+      showSuccess("Device created successfully!");
     } catch {
       alert("Failed to create device.");
     }
@@ -61,6 +69,7 @@ export default function Devices() {
       await DeviceService.update(editingDevice.id, editingDevice);
       setEditingDevice(null);
       fetchDevices();
+      showSuccess("Device updated successfully!");
     } catch {
       alert("Failed to update device.");
     }
@@ -71,6 +80,7 @@ export default function Devices() {
     try {
       await DeviceService.delete(device.id);
       setDevices(devices.filter((d) => d.id !== device.id));
+      showSuccess("Device deleted.");
     } catch {
       alert("Failed to delete device.");
     }
@@ -91,6 +101,7 @@ export default function Devices() {
 
       await DeviceService.saveCredentials(credentialsDevice.id, payload);
       setCredentialsDevice(null);
+      showSuccess("Credentials stored successfully!");
     } catch {
       alert("Failed to save credentials.");
     }
@@ -113,6 +124,22 @@ export default function Devices() {
   return (
     <div className="dashboard-card">
       <h1>Devices</h1>
+      
+      {message && (
+        <div style={{ 
+          padding: "12px 16px", 
+          backgroundColor: "#ecfdf5", 
+          color: "#065f46", 
+          borderRadius: "8px", 
+          marginBottom: "16px",
+          border: "1px solid #10b981",
+          fontWeight: "500",
+          animation: "fadeIn 0.3s ease-out"
+        }}>
+          ✓ {message}
+        </div>
+      )}
+
       <button className="add-device-btn" onClick={() => setShowAddModal(true)}>
         Add Device
       </button>

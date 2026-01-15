@@ -31,6 +31,13 @@ export default function Users() {
       }
   }
 
+  const [message, setMessage] = useState(null);
+
+  const showSuccess = (msg) => {
+    setMessage(msg);
+    setTimeout(() => setMessage(null), 3000);
+  };
+
   useEffect(() => {
     fetchUsers();
   }, []);
@@ -51,6 +58,7 @@ export default function Users() {
       setShowAddModal(false);
       setNewUser({ email: "", full_name: "", password: "", role: "viewer" });
       fetchUsers();
+      showSuccess("User created successfully!");
     } catch {
       alert("Failed to create user.");
     }
@@ -61,6 +69,7 @@ export default function Users() {
       await api.patch(`/users/${editingUser.id}`, editingUser);
       setEditingUser(null);
       fetchUsers();
+      showSuccess("User updated successfully!");
     } catch {
       alert("Failed to update user.");
     }
@@ -76,6 +85,7 @@ export default function Users() {
     try {
       await api.delete(`/users/${user.id}`);
       setUsers(users.filter((u) => u.id !== user.id));
+      showSuccess("User deleted.");
     } catch {
       alert("Failed to delete user.");
     }
@@ -96,6 +106,21 @@ export default function Users() {
   return (
     <div className="dashboard-card">
       <h1>Users</h1>
+
+      {message && (
+        <div style={{ 
+          padding: "12px 16px", 
+          backgroundColor: "#ecfdf5", 
+          color: "#065f46", 
+          borderRadius: "8px", 
+          marginBottom: "16px",
+          border: "1px solid #10b981",
+          fontWeight: "500",
+          animation: "fadeIn 0.3s ease-out"
+        }}>
+          ✓ {message}
+        </div>
+      )}
 
       <button className="add-device-btn" onClick={() => setShowAddModal(true)}>
         Add User

@@ -29,6 +29,8 @@ class Device(Base):
     last_memory = Column(Float, nullable=True)
     last_traffic = Column(Float, nullable=True)
     last_polled = Column(DateTime, nullable=True)
+    last_error = Column(String, nullable=True)
+    failing_protocols = Column(String, nullable=True) # JSON list e.g. '["ssh"]'
 
     credentials = relationship(
         "DeviceCredential",

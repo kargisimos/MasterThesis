@@ -19,6 +19,10 @@ class Settings(BaseSettings):
     DEFAULT_ADMIN_FULL_NAME: str
 
     DEVICE_CREDENTIAL_SECRET_KEY: str
+    
+    POLLING_INTERVAL: int
+    REDIS_HOST: str
+    REDIS_PORT: int
 
 
     class Config:

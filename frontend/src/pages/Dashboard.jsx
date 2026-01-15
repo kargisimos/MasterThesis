@@ -23,7 +23,7 @@ export default function Dashboard() {
       const data = await DeviceService.getAll();
       setDevices(data);
       const trends = await DeviceService.getTrends(timeframe);
-      setNetworkTrends(trends);
+      setNetworkTrends(trends || []);
     } catch (error) {
       console.error("Failed to fetch dashboard data:", error);
     } finally {
@@ -42,7 +42,7 @@ export default function Dashboard() {
 
   const connectWebSocket = () => {
     if (wsRef.current?.readyState === WebSocket.OPEN) {
-      return; // Already connected
+      return;
     }
 
     const ws = new WebSocket("ws://localhost:8000/ws");
@@ -73,6 +73,14 @@ export default function Dashboard() {
             return prevDevices;
           });
           
+          // Synchronize the detail modal if it's currently open for this device
+          setDeviceModal(prevModal => {
+            if (prevModal && prevModal.id === data.device.id) {
+              return { ...prevModal, ...data.device };
+            }
+            return prevModal;
+          });
+          
           setLastUpdate(new Date().toLocaleTimeString());
           console.log(`🔄 Real-time update for ${data.device.name}`);
         }
@@ -101,7 +109,6 @@ export default function Dashboard() {
     wsRef.current = ws;
   };
 
-  // WebSocket connection effect
   useEffect(() => {
     connectWebSocket();
 
@@ -138,21 +145,61 @@ export default function Dashboard() {
       if (d.last_status === "offline") {
         triggers.push({ id: `off-${d.id}`, priority: "critical", msg: `${d.name}: Host is unreachable`, time: "Just now" });
       } else {
+        // Parse failing protocols list and create separate alerts for each
+        try {
+          const failing = JSON.parse(d.failing_protocols || "[]");
+          failing.forEach(protocol => {
+            // ONLY show alert if the protocol is actually configured
+            const isConfigured = d.configured_credentials?.includes(protocol.toLowerCase());
+            if (!isConfigured) return;
+
+            const isAuth = d.last_error?.toLowerCase().includes("auth failed");
+            triggers.push({ 
+              id: `fail-${protocol}-${d.id}`, 
+              priority: isAuth ? "critical" : "warning", 
+              msg: `${d.name}: ${protocol.toUpperCase()} ${isAuth ? 'Auth Failed' : 'Polling Error'}`, 
+              time: "Action Required" 
+            });
+          });
+        } catch (e) {
+          console.error("Failed to parse failing protocols:", e);
+        }
+
         if (d.last_cpu > 80) triggers.push({ id: `cpu-${d.id}`, priority: "critical", msg: `${d.name}: Critical CPU Usage (${d.last_cpu}%)`, time: "Recent" });
         if (d.last_memory > 85) triggers.push({ id: `mem-${d.id}`, priority: "warning", msg: `${d.name}: High Memory Usage (${d.last_memory}%)`, time: "Recent" });
         if (d.last_latency > 40) triggers.push({ id: `lat-${d.id}`, priority: "warning", msg: `${d.name}: High Latency (${d.last_latency}ms)`, time: "Recent" });
       }
     });
-    return triggers.sort((a, b) => (a.priority === "critical" ? -1 : 1)).slice(0, 5);
+    return triggers.sort((a, b) => (a.priority === "critical" ? -1 : 1)).slice(0, 10);
   }, [devices]);
 
   const totalDevices = devices.length;
-  const onlineDevices = devices.filter(d => d.last_status === "online").length;
+  const onlineCount = devices.filter(d => d.last_status === "online").length;
   const activeDevices = devices.filter(d => d.last_status === "online");
-  const avgCPU = (activeDevices.reduce((acc, d) => acc + (d.last_cpu || 0), 0) / onlineDevices || 0).toFixed(1);
-  const avgMemory = (activeDevices.reduce((acc, d) => acc + (d.last_memory || 0), 0) / onlineDevices || 0).toFixed(1);
-  const avgLatency = (activeDevices.reduce((acc, d) => acc + (d.last_latency || 0), 0) / onlineDevices || 0).toFixed(1);
-  const avgTraffic = (activeDevices.reduce((acc, d) => acc + (d.last_traffic || 0), 0) / onlineDevices || 0).toFixed(1);
+  const avgCPU = (activeDevices.reduce((acc, d) => acc + (Number(d.last_cpu) || 0), 0) / onlineCount || 0);
+  const avgMemory = (activeDevices.reduce((acc, d) => acc + (Number(d.last_memory) || 0), 0) / onlineCount || 0);
+  const avgLatency = (activeDevices.reduce((acc, d) => acc + (Number(d.last_latency) || 0), 0) / onlineCount || 0);
+  const avgTraffic = (activeDevices.reduce((acc, d) => acc + (Number(d.last_traffic) || 0), 0) / onlineCount || 0);
+
+  const getMetricColor = (type, value) => {
+    if (value === null || value === undefined) return "var(--text-muted)";
+    if (type === "cpu") {
+      if (value > 80) return "#ef4444";
+      if (value > 60) return "#f59e0b";
+      return "#10b981";
+    }
+    if (type === "mem") {
+      if (value > 85) return "#ef4444";
+      if (value > 70) return "#f59e0b";
+      return "#10b981";
+    }
+    if (type === "lat") {
+      if (value > 40) return "#ef4444";
+      if (value > 20) return "#f59e0b";
+      return "#10b981";
+    }
+    return "inherit";
+  };
 
   const chartOptions = useMemo(() => ({
     responsive: true,
@@ -162,24 +209,137 @@ export default function Dashboard() {
       tooltip: { backgroundColor: '#0f172a', padding: 12, cornerRadius: 8 }
     },
     scales: {
-      y: { beginAtZero: true, grid: { color: 'rgba(0,0,0,0.03)' } },
-      x: { grid: { display: false }, ticks: { display: false } }
+      y: { 
+        beginAtZero: true, 
+        grid: { color: 'rgba(0,0,0,0.03)' },
+        ticks: { font: { size: 10 } }
+      },
+      x: { 
+        grid: { display: false }, 
+        ticks: { 
+          display: true, 
+          maxRotation: 0, 
+          autoSkip: true, 
+          maxTicksLimit: 6,
+          font: { size: 10 }
+        } 
+      }
     }
   }), []);
 
-  const getChartData = (label, dataKey, color, bgColor) => ({
-    labels: deviceHistory.map(h => new Date(h.timestamp).toLocaleTimeString()),
-    datasets: [
-      { 
-        label, 
-        data: deviceHistory.map(h => h[dataKey]), 
-        borderColor: color, 
-        backgroundColor: bgColor, 
-        fill: true, 
-        tension: 0.4 
-      },
-    ]
-  });
+  const resourceLoadOptions = useMemo(() => ({
+    ...chartOptions,
+    scales: {
+      ...chartOptions.scales,
+      y: { ...chartOptions.scales.y, max: 100 }
+    }
+  }), [chartOptions]);
+
+  const throughputChartOptions = useMemo(() => ({
+    ...chartOptions,
+    scales: {
+      ...chartOptions.scales,
+      y: { 
+        ...chartOptions.scales.y,
+        ticks: {
+          ...chartOptions.scales.y.ticks,
+          callback: (value) => value.toLocaleString(undefined, { minimumFractionDigits: 0, maximumFractionDigits: 4 })
+        }
+      }
+    }
+  }), [chartOptions]);
+
+  const formatTraffic = (mbs) => {
+    if (mbs === null || mbs === undefined) return "0 B/s";
+    let bytes = mbs * 1048576; // Convert back to bytes for adaptive formatting
+    if (bytes < 1024) return `${bytes.toFixed(2)} B/s`;
+    if (bytes < 1048576) return `${(bytes / 1024).toFixed(2)} KB/s`;
+    if (bytes < 1073741824) return `${(bytes / 1048576).toFixed(2)} MB/s`;
+    return `${(bytes / 1073741824).toFixed(2)} GB/s`;
+  };
+
+  const ProtocolBadge = ({ type, configured, failed }) => {
+    // Hierarchy: Not Configured (Gray) > Failed (Red) > Working (Green)
+    const color = !configured ? "#cfcfcf" : (failed ? "#ef4444" : "#10b981");
+    return (
+      <span style={{
+        fontSize: "0.65rem",
+        padding: "2px 6px",
+        borderRadius: "4px",
+        backgroundColor: color,
+        color: "#fff",
+        fontWeight: "700",
+        textTransform: "uppercase",
+      }}>
+        {type}
+      </span>
+    );
+  };
+
+  const getChartData = (label, dataKeys, historyData, colors, bgColors, range = "24h") => {
+    const isSmallRange = range === "24h";
+    const keys = Array.isArray(dataKeys) ? dataKeys : [dataKeys];
+    const labels = Array.isArray(label) ? label : [label];
+    const borderColors = Array.isArray(colors) ? colors : [colors];
+    const backgroundColors = Array.isArray(bgColors) ? bgColors : [bgColors];
+
+    let chartLabels = [];
+    let datasetsData = keys.map(() => []);
+
+    if (range === "7d" || range === "30d") {
+      const daysCount = range === "7d" ? 7 : 30;
+      const dateMap = {};
+      
+      // 1. Generate the last X days as a "calendar"
+      for (let i = daysCount - 1; i >= 0; i--) {
+        const d = new Date();
+        d.setDate(d.getDate() - i);
+        const labelStr = d.toLocaleDateString([], { month: 'short', day: 'numeric' });
+        chartLabels.push(labelStr);
+        dateMap[labelStr] = keys.map(() => 0); // Initialize with 0s
+      }
+
+      // 2. Fill the calendar with data from historyData
+      historyData.forEach(h => {
+        const d = new Date(h.timestamp);
+        const labelStr = d.toLocaleDateString([], { month: 'short', day: 'numeric' });
+        if (dateMap[labelStr]) {
+          keys.forEach((key, idx) => {
+            // Take the max or avg if multiple entries exist, but with daily buckets it should be 1:1
+            dateMap[labelStr][idx] = h[key] || 0;
+          });
+        }
+      });
+
+      // 3. Extract back into arrays
+      chartLabels.forEach(lbl => {
+        keys.forEach((_, idx) => {
+          datasetsData[idx].push(dateMap[lbl][idx]);
+        });
+      });
+    } else {
+      // 24h / Real-time: Use raw timestamps as they come
+      chartLabels = historyData.map(h => {
+        const d = new Date(h.timestamp);
+        return d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+      });
+      keys.forEach((key, idx) => {
+        datasetsData[idx] = historyData.map(h => h[key]);
+      });
+    }
+
+    return {
+      labels: chartLabels,
+      datasets: keys.map((key, i) => ({
+        label: labels[i] || labels[0],
+        data: datasetsData[i],
+        borderColor: borderColors[i] || borderColors[0],
+        backgroundColor: backgroundColors[i] || backgroundColors[0],
+        fill: true,
+        tension: 0.4
+      }))
+    };
+  };
 
   if (isLoading && devices.length === 0) {
     return <div className="board"><div style={{ padding: "40px", textAlign: "center" }}>Initializing Dashboard...</div></div>;
@@ -212,30 +372,30 @@ export default function Dashboard() {
         
         <select value={timeframe} onChange={e => setTimeframe(e.target.value)} style={{ padding: "10px 16px", borderRadius: "10px", border: "1px solid #e2e8f0", fontWeight: "600" }}>
           <option value="24h">Real-time Stream</option>
-          <option value="week">Last 7 Days</option>
-          <option value="month">Last 30 Days</option>
+          <option value="7d">Last 7 Days</option>
+          <option value="30d">Last 30 Days</option>
         </select>
       </div>
 
       <div className="dashboard-summary">
         <div className="dashboard-summary-card">
           <h3>Inventory Health</h3>
-          <p><span style={{ color: "var(--text-muted)", fontSize: "0.95rem" }}>Online Devices:</span> <b>{onlineDevices} / {totalDevices}</b></p>
+          <p><span style={{ color: "var(--text-muted)", fontSize: "0.95rem" }}>Online Devices:</span> <b>{onlineCount} / {totalDevices}</b></p>
           <div className="sub-text">Active Health Alerts: <b style={{ color: "var(--critical)" }}>{activeTriggers.length}</b></div>
         </div>
         <div className="dashboard-summary-card">
           <h3>Resource Load</h3>
-          <p><span style={{ color: "var(--text-muted)", fontSize: "0.95rem" }}>Average CPU Usage:</span> <b>{avgCPU}%</b></p>
-          <div className="sub-text">Average Memory Usage: <b>{avgMemory}%</b></div>
+          <p><span style={{ color: "var(--text-muted)", fontSize: "0.95rem" }}>Average CPU Usage:</span> <b>{Number(avgCPU).toFixed(1)}%</b></p>
+          <div className="sub-text">Average Memory Usage: <b>{Number(avgMemory).toFixed(1)}%</b></div>
         </div>
         <div className="dashboard-summary-card">
           <h3>Network Status</h3>
-          <p><span style={{ color: "var(--text-muted)", fontSize: "0.95rem" }}>Average Throughput:</span> <b>{avgTraffic} Mbps</b></p>
-          <div className="sub-text">Average Response Latency: <b>{avgLatency} ms</b></div>
+          <p><span style={{ color: "var(--text-muted)", fontSize: "0.95rem" }}>Average Throughput:</span> <b>{formatTraffic(avgTraffic)}</b></p>
+          <div className="sub-text">Average Response Latency: <b>{Number(avgLatency).toFixed(1)} ms</b></div>
         </div>
       </div>
 
-      <div className="dashboard-charts" style={{ display: "grid", gridTemplateColumns: "1.2fr 2fr 2fr", gap: "24px", marginBottom: "32px" }}>
+      <div className="dashboard-charts">
         <div className="dashboard-chart-card">
           <h3 style={{ marginBottom: "16px" }}>Critical Alerts</h3>
           <div className="trigger-list">
@@ -252,33 +412,52 @@ export default function Dashboard() {
         </div>
 
         <div className="dashboard-chart-card">
-          <h3>Resource Load Trends</h3>
+          <h3>Resource Trends (CPU/Mem)</h3>
           <div className="chart-container" style={{ height: "250px" }}>
             <Line 
-              data={{
-                labels: networkTrends.map(t => new Date(t.timestamp).toLocaleTimeString()),
-                datasets: [
-                  { label: "Avg CPU (%)", data: networkTrends.map(t => t.avg_cpu), borderColor: "#3b82f6", tension: 0.4, fill: true, backgroundColor: "rgba(59,130,246,0.05)" },
-                  { label: "Avg Mem (%)", data: networkTrends.map(t => t.avg_memory), borderColor: "#f59e0b", tension: 0.4, fill: true, backgroundColor: "rgba(245,158,11,0.05)" }
-                ]
-              }} 
+              data={getChartData(
+                ["Avg CPU (%)", "Avg Mem (%)"], 
+                ["avg_cpu", "avg_memory"], 
+                networkTrends, 
+                ["#3b82f6", "#f59e0b"], 
+                ["rgba(59,130,246,0.05)", "rgba(245,158,11,0.05)"],
+                timeframe
+              )}
+              options={resourceLoadOptions} 
+            />
+          </div>
+        </div>
+
+        <div className="dashboard-chart-card">
+          <h3>Latency Trends</h3>
+          <div className="chart-container" style={{ height: "250px" }}>
+            <Line 
+              data={getChartData(
+                "Avg Latency (ms)", 
+                "avg_latency", 
+                networkTrends, 
+                "#8b5cf6", 
+                "rgba(139,92,246,0.05)",
+                timeframe
+              )}
               options={chartOptions} 
             />
           </div>
         </div>
 
         <div className="dashboard-chart-card">
-          <h3>Consistency Trends</h3>
+          <h3>Throughput Trends</h3>
           <div className="chart-container" style={{ height: "250px" }}>
             <Line 
-              data={{
-                labels: networkTrends.map(t => new Date(t.timestamp).toLocaleTimeString()),
-                datasets: [
-                  { label: "Latency (ms)", data: networkTrends.map(t => t.avg_latency), borderColor: "#8b5cf6", tension: 0.4, fill: true, backgroundColor: "rgba(139,92,246,0.05)" },
-                  { label: "Traffic (Mbps)", data: networkTrends.map(t => t.avg_traffic), borderColor: "#10b981", tension: 0.4, fill: true, backgroundColor: "rgba(16,185,129,0.05)" }
-                ]
-              }} 
-              options={chartOptions} 
+              data={getChartData(
+                "Avg Traffic (MB/s)", 
+                "avg_traffic", 
+                networkTrends, 
+                "#10b981", 
+                "rgba(16,185,129,0.1)",
+                timeframe
+              )}
+              options={throughputChartOptions} 
             />
           </div>
         </div>
@@ -288,13 +467,45 @@ export default function Dashboard() {
       <div className="device-metrics">
         {devices.map(device => (
           <div key={device.id} className="device-card" onClick={() => userRole !== "viewer" && setDeviceModal(device)}>
-            <div style={{ display: "flex", justifyContent: "space-between", marginBottom: "12px" }}>
+            <div style={{ display: "flex", justifyContent: "space-between", marginBottom: "8px" }}>
               <h4 style={{ margin: 0 }}>{device.name}</h4>
-              <span className={`status-dot ${device.last_status}`}></span>
+              <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
+                <div style={{ display: "flex", gap: "4px" }}>
+                  <ProtocolBadge 
+                    type="SSH" 
+                    configured={device.configured_credentials?.includes("ssh")} 
+                    failed={JSON.parse(device.failing_protocols || "[]").includes("ssh")} 
+                  />
+                  <ProtocolBadge 
+                    type="SNMP" 
+                    configured={device.configured_credentials?.includes("snmp")} 
+                    failed={JSON.parse(device.failing_protocols || "[]").includes("snmp")} 
+                  />
+                </div>
+                <span className={`status-dot ${device.last_status}`}></span>
+              </div>
             </div>
-            <div className="latency-indicator good">
-              <span style={{ fontSize: "0.75rem" }}>CPU: <b>{device.last_cpu || 0}%</b> | Mem: <b>{device.last_memory || 0}%</b></span>
-              <span className="metric-badge">{device.last_latency || "--"} ms</span>
+            <div className="latency-indicator good" style={{ borderLeft: `4px solid ${device.last_status === 'online' ? (device.last_error ? '#f59e0b' : '#10b981') : '#ef4444'}` }}>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                {device.last_error ? (
+                  <span style={{ fontSize: "0.75rem", color: "#ef4444", fontWeight: "600" }}>
+                    ⚠️ {device.last_error}
+                  </span>
+                ) : (
+                  <>
+                    <span style={{ fontSize: "0.75rem" }}>
+                      CPU: <b style={{ color: getMetricColor("cpu", device.last_cpu) }}>{device.last_cpu || 0}%</b> | 
+                      Mem: <b style={{ color: getMetricColor("mem", device.last_memory) }}>{device.last_memory || 0}%</b>
+                    </span>
+                    <span style={{ fontSize: "0.75rem" }}>
+                      Traf: <b>{formatTraffic(device.last_traffic)}</b>
+                    </span>
+                  </>
+                )}
+              </div>
+              <span className="metric-badge" style={{ backgroundColor: getMetricColor("lat", device.last_latency), color: '#fff' }}>
+                {device.last_latency || "--"} ms
+              </span>
             </div>
             <div style={{ marginTop: "12px", fontSize: "0.80rem", color: "var(--text-muted)" }}>IP: <b>{device.ip_address}</b></div>
           </div>
@@ -309,22 +520,50 @@ export default function Dashboard() {
                 <h2 style={{ margin: 0 }}>{deviceModal.name} Diagnostic Detail</h2>
                 <div style={{ color: "var(--text-muted)", fontSize: "0.9rem" }}>IP: {deviceModal.ip_address} | Type: {deviceModal.type.toUpperCase()}</div>
               </div>
-              <button className="modal-close" onClick={() => setDeviceModal(null)}>Close</button>
+              <div style={{ display: 'flex', gap: '8px' }}>
+                <select 
+                  value={modalTimeframe} 
+                  onChange={e => setModalTimeframe(e.target.value)}
+                  style={{ padding: "6px 12px", borderRadius: "8px", border: "1px solid #e2e8f0", fontSize: "0.85rem" }}
+                >
+                  <option value="24h">Real-time Stream</option>
+                  <option value="7d">7 Days</option>
+                  <option value="30d">30 Days</option>
+                </select>
+                <button className="modal-close" onClick={() => setDeviceModal(null)}>Close</button>
+              </div>
             </div>
             
             <div className="modal-grid">
               <div className="modal-info">
                 <h3>Vitals (Current)</h3>
                 <p>Status: <b style={{ color: deviceModal.last_status === "online" ? "var(--success)" : "var(--danger)" }}>{deviceModal.last_status.toUpperCase()}</b></p>
-                <p>CPU Load: <b>{deviceModal.last_cpu || 0}%</b></p>
-                <p>Memory Usage: <b>{deviceModal.last_memory || 0}%</b></p>
-                <p>Response Latency: <b>{deviceModal.last_latency || "--"} ms</b></p>
+                {deviceModal.last_error && (
+                  <p>Last Error: <b style={{ color: "var(--danger)" }}>{deviceModal.last_error}</b></p>
+                )}
+                <p>CPU Load: <b style={{ color: getMetricColor("cpu", deviceModal.last_cpu) }}>{deviceModal.last_cpu || 0}%</b></p>
+                <p>Memory Usage: <b style={{ color: getMetricColor("mem", deviceModal.last_memory) }}>{deviceModal.last_memory || 0}%</b></p>
+                <p>Response Latency: <b style={{ color: getMetricColor("lat", deviceModal.last_latency) }}>{deviceModal.last_latency || "--"} ms</b></p>
               </div>
               <div className="modal-info">
                 <h3>Detailed Meta</h3>
                 <p>Location: <b>{deviceModal.location || "Not set"}</b></p>
-                <p>Manufacturer: <b>{deviceModal.manufacturer || "Unknown"}</b></p>
                 <p>Last Polled: <b>{deviceModal.last_polled ? new Date(deviceModal.last_polled).toLocaleTimeString() : "Never"}</b></p>
+                <div style={{ marginTop: "12px", paddingTop: "12px", borderTop: "1px solid #eee" }}>
+                  <div style={{ fontSize: "0.85rem", fontWeight: "600", marginBottom: "6px" }}>Poll Protocols:</div>
+                  <div style={{ display: "flex", gap: "8px" }}>
+                    <ProtocolBadge 
+                      type="SSH" 
+                      configured={deviceModal.configured_credentials?.includes("ssh")} 
+                      failed={JSON.parse(deviceModal.failing_protocols || "[]").includes("ssh")} 
+                    />
+                    <ProtocolBadge 
+                      type="SNMP" 
+                      configured={deviceModal.configured_credentials?.includes("snmp")} 
+                      failed={JSON.parse(deviceModal.failing_protocols || "[]").includes("snmp")} 
+                    />
+                  </div>
+                </div>
               </div>
             </div>
 
@@ -332,13 +571,19 @@ export default function Dashboard() {
               <div className="dashboard-chart-card">
                 <h3 style={{ fontSize: '1.1rem', marginBottom: '16px' }}>CPU Load History (%)</h3>
                 <div className="chart-container" style={{ height: "220px" }}>
-                  <Line data={getChartData("CPU (%)", "cpu_usage", "#3b82f6", "rgba(59,130,246,0.1)")} options={chartOptions} />
+                  <Line data={getChartData("CPU (%)", "cpu_usage", deviceHistory, "#3b82f6", "rgba(59,130,246,0.1)", modalTimeframe)} options={resourceLoadOptions} />
                 </div>
               </div>
               <div className="dashboard-chart-card">
                 <h3 style={{ fontSize: '1.1rem', marginBottom: '16px' }}>Memory Usage History (%)</h3>
                 <div className="chart-container" style={{ height: "220px" }}>
-                  <Line data={getChartData("Memory (%)", "memory_usage", "#f59e0b", "rgba(245,158,11,0.1)")} options={chartOptions} />
+                  <Line data={getChartData("Memory (%)", "memory_usage", deviceHistory, "#f59e0b", "rgba(245,158,11,0.1)", modalTimeframe)} options={resourceLoadOptions} />
+                </div>
+              </div>
+              <div className="dashboard-chart-card">
+                <h3 style={{ fontSize: '1.1rem', marginBottom: '16px' }}>Network Throughput</h3>
+                <div className="chart-container" style={{ height: "220px" }}>
+                  <Line data={getChartData("Traffic (MB/s)", "traffic", deviceHistory, "#10b981", "rgba(16,185,129,0.1)", modalTimeframe)} options={throughputChartOptions} />
                 </div>
               </div>
             </div>

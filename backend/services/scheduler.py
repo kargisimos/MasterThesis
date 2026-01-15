@@ -1,5 +1,6 @@
 import asyncio
 from services.monitors import run_monitoring_cycle
+from config import settings
 
 async def start_scheduler():
     print("Background Monitoring Scheduler initialized.")
@@ -9,7 +10,7 @@ async def start_scheduler():
         except Exception as e:
             print(f"Error in monitoring cycle: {e}")
         
-        await asyncio.sleep(60)
+        await asyncio.sleep(settings.POLLING_INTERVAL)
 
 def register_scheduler():
     loop = asyncio.get_event_loop()

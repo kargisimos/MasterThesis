@@ -18,10 +18,11 @@ _fernet = Fernet(_derive_key(settings.DEVICE_CREDENTIAL_SECRET_KEY))
 def encrypt_value(value: str | None) -> str | None:
     """
     Encrypt a sensitive value for storage.
+    Treat None, empty strings, or whitespace-only strings as None.
     """
-    if value is None:
+    if not value or not str(value).strip():
         return None
-    return _fernet.encrypt(value.encode()).decode()
+    return _fernet.encrypt(str(value).encode()).decode()
 
 
 def decrypt_value(value: str | None) -> str | None:

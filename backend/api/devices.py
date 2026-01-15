@@ -1,6 +1,10 @@
-from fastapi import APIRouter, Depends, HTTPException, status
-from sqlalchemy.orm import Session
 from typing import List
+from datetime import datetime, timedelta
+import json
+
+from fastapi import APIRouter, Depends, HTTPException, status
+from sqlalchemy import func, text, literal_column
+from sqlalchemy.orm import Session
 
 from models.device import Device, DeviceCredential, DeviceMetric
 from schemas.device import DeviceCreate, DeviceOut, DeviceUpdate, CredentialCreate, CredentialOut, MetricOut, TrendOut
@@ -8,6 +12,7 @@ from services.auditlogger import log_action
 from services.encryptor import encrypt_value
 from services.db import get_db
 from services.security import get_current_user
+from api.websocket import manager
 
 router = APIRouter(tags=["Devices"])
 
@@ -35,7 +40,7 @@ def create_device(
     db.add(device)
     db.commit()
     db.refresh(device)
-
+    device.configured_credentials = []
     log_action(
         db=db,
         action="device_created",
@@ -55,7 +60,19 @@ def list_devices(
     if current_user.role not in ["admin", "operator", "viewer"]:
         raise HTTPException(status_code=403, detail="Not authorized")
 
-    return db.query(Device).all()
+    devices = db.query(Device).all()
+    for device in devices:
+        creds = []
+        for c in device.credentials:
+            # We store None for blank fields in the DB, so truthy check works even for encrypted values
+            if c.type == "ssh":
+                if c.username and c.password:
+                    creds.append("ssh")
+            elif c.type == "snmp":
+                if c.community_string:
+                    creds.append("snmp")
+        device.configured_credentials = creds
+    return devices
 
 
 @router.get("/stats/trends", response_model=List[TrendOut])
@@ -71,43 +88,42 @@ def get_network_trends(
     if current_user.role not in ["admin", "operator", "viewer"]:
         raise HTTPException(status_code=403, detail="Not authorized")
 
-    from sqlalchemy import func
-    from datetime import datetime, timedelta
-
-    # Calculate start time based on range
-    start_time = datetime.utcnow() - timedelta(hours=24)
+    # Calculate start time and interval based on range
+    now = datetime.utcnow()
     if range == "7d":
-        start_time = datetime.utcnow() - timedelta(days=7)
+        start_time = (now - timedelta(days=6)).replace(hour=0, minute=0, second=0, microsecond=0)
+        bucket_expr = func.date_trunc('day', DeviceMetric.timestamp)
     elif range == "30d":
-        start_time = datetime.utcnow() - timedelta(days=30)
-    
-    # Simple limit adjustment for different ranges
-    limit_pts = 50 if range == "24h" else 100
+        start_time = (now - timedelta(days=29)).replace(hour=0, minute=0, second=0, microsecond=0)
+        bucket_expr = func.date_trunc('day', DeviceMetric.timestamp)
+    else:
+        start_time = now - timedelta(hours=24)
+        # 300 seconds = 5 minutes
+        bucket_expr = literal_column("to_timestamp(floor(extract(epoch from timestamp) / 300) * 300)")
 
     results = (
         db.query(
-            DeviceMetric.timestamp,
+            bucket_expr.label("bucket"),
             func.avg(DeviceMetric.cpu_usage).label("avg_cpu"),
             func.avg(DeviceMetric.memory_usage).label("avg_memory"),
             func.avg(DeviceMetric.latency).label("avg_latency"),
             func.avg(DeviceMetric.traffic).label("avg_traffic"),
         )
         .filter(DeviceMetric.timestamp >= start_time)
-        .group_by(DeviceMetric.timestamp)
-        .order_by(DeviceMetric.timestamp.desc())
-        .limit(limit_pts)
+        .group_by(text("bucket"))
+        .order_by(text("bucket ASC"))
         .all()
     )
 
     return [
         TrendOut(
-            timestamp=r.timestamp, 
+            timestamp=r.bucket, 
             avg_cpu=float(r.avg_cpu or 0), 
             avg_memory=float(r.avg_memory or 0), 
             avg_latency=float(r.avg_latency or 0),
             avg_traffic=float(r.avg_traffic or 0)
         ) 
-        for r in reversed(results)
+        for r in results
     ]
 
 
@@ -133,7 +149,13 @@ def update_device(
 
     db.commit()
     db.refresh(device)
-
+    creds = []
+    for c in device.credentials:
+        if c.type == "ssh" and c.username and c.password:
+            creds.append("ssh")
+        elif c.type == "snmp" and c.community_string:
+            creds.append("snmp")
+    device.configured_credentials = creds
     log_action(
         db=db,
         action="device_updated",
@@ -174,7 +196,7 @@ def delete_device(
 
 
 @router.post("/{device_id}/credentials", response_model=CredentialOut)
-def create_or_update_credential(
+async def create_or_update_credential(
     device_id: int,
     cred_in: CredentialCreate,
     db: Session = Depends(get_db),
@@ -187,15 +209,20 @@ def create_or_update_credential(
     if not device:
         raise HTTPException(status_code=404, detail="Device not found")
 
+    # Treat empty strings as None before encryption
+    ssh_u = cred_in.username if cred_in.username else None
+    ssh_p = cred_in.password if cred_in.password else None
+    snmp_c = cred_in.community_string if cred_in.community_string else None
+
     # Encrypt sensitive fields
     if cred_in.type == "ssh":
-        username_enc = encrypt_value(cred_in.username)
-        password_enc = encrypt_value(cred_in.password)
+        username_enc = encrypt_value(ssh_u)
+        password_enc = encrypt_value(ssh_p)
         community_enc = None
     elif cred_in.type == "snmp":
         username_enc = None
         password_enc = None
-        community_enc = encrypt_value(cred_in.community_string)
+        community_enc = encrypt_value(snmp_c)
     else:
         raise HTTPException(status_code=400, detail="Invalid credential type")
 
@@ -222,6 +249,29 @@ def create_or_update_credential(
     db.commit()
     db.refresh(cred)
 
+    # If the new credential is blank, clear its "failing" state in the device model
+    # so it immediately turns Gray in the UI and stops alerting.
+    is_blank = False
+    if cred_in.type == "ssh" and (not cred_in.username or not cred_in.password):
+        is_blank = True
+    elif cred_in.type == "snmp" and not cred_in.community_string:
+        is_blank = True
+
+    if is_blank:
+        try:
+            failing = json.loads(device.failing_protocols or "[]")
+            if cred_in.type in failing:
+                failing.remove(cred_in.type)
+                device.failing_protocols = json.dumps(failing)
+                # Also clean up last_error if it contains this protocol
+                if device.last_error:
+                    parts = [p.strip() for p in device.last_error.split("&")]
+                    new_parts = [p for p in parts if not p.upper().startswith(cred_in.type.upper())]
+                    device.last_error = " & ".join(new_parts) if new_parts else None
+                db.commit()
+        except Exception as e:
+            print(f"Error clearing failing state: {e}")
+
     log_action(
         db=db,
         action=f"{cred_in.type}_credential_stored",
@@ -229,6 +279,36 @@ def create_or_update_credential(
         target_type="device",
         target_name=device.name,
     )
+
+    db.refresh(device)
+    # BROADCAST the update immediately
+    conf_creds = []
+    for c in device.credentials:
+        if c.type == "ssh" and c.username and c.password:
+            conf_creds.append("ssh")
+        elif c.type == "snmp" and c.community_string:
+            conf_creds.append("snmp")
+            
+    try:
+        await manager.broadcast({
+            "type": "device_update",
+            "device": {
+                "id": device.id,
+                "name": device.name,
+                "ip_address": device.ip_address,
+                "last_status": device.last_status,
+                "last_latency": device.last_latency,
+                "last_cpu": device.last_cpu,
+                "last_memory": device.last_memory,
+                "last_traffic": device.last_traffic,
+                "last_polled": device.last_polled.isoformat() if device.last_polled else None,
+                "last_error": device.last_error,
+                "failing_protocols": device.failing_protocols,
+                "configured_credentials": conf_creds
+            }
+        })
+    except Exception as e:
+        print(f"Error broadcasting credential update: {e}")
 
     return CredentialOut(
         device_id=device_id,
@@ -246,22 +326,58 @@ def get_device_history(
     if current_user.role not in ["admin", "operator", "viewer"]:
         raise HTTPException(status_code=403, detail="Not authorized")
 
-    from datetime import datetime, timedelta
-    
-    start_time = datetime.utcnow() - timedelta(hours=24)
-    if range == "7d":
-        start_time = datetime.utcnow() - timedelta(days=7)
-        limit = 500
-    elif range == "30d":
-        start_time = datetime.utcnow() - timedelta(days=30)
-        limit = 1000
+    now = datetime.utcnow()
 
-    return (
-        db.query(DeviceMetric)
-        .filter(DeviceMetric.device_id == device_id, DeviceMetric.timestamp >= start_time)
-        .order_by(DeviceMetric.timestamp.desc())
-        .limit(limit)
-        .all()
-    )
+    if range == "7d":
+        start_time = (now - timedelta(days=6)).replace(hour=0, minute=0, second=0, microsecond=0)
+        interval = "1 day"
+    elif range == "30d":
+        start_time = (now - timedelta(days=29)).replace(hour=0, minute=0, second=0, microsecond=0)
+        interval = "1 day"
+    else:
+        return (
+            db.query(DeviceMetric)
+            .filter(DeviceMetric.device_id == device_id, DeviceMetric.timestamp >= (now - timedelta(hours=24)))
+            .order_by(DeviceMetric.timestamp.desc())
+            .limit(limit)
+            .all()
+        )
+
+    # For 7d/30d use generate_series to provide "calendar" view
+    sql = text("""
+        SELECT 
+            series.bucket,
+            COALESCE(AVG(m.cpu_usage), 0) as cpu_usage,
+            COALESCE(AVG(m.memory_usage), 0) as memory_usage,
+            COALESCE(AVG(m.latency), 0) as latency,
+            COALESCE(AVG(m.traffic), 0) as traffic
+        FROM generate_series(:start_time, :now, :interval::interval) AS series(bucket)
+        LEFT JOIN device_metrics m ON 
+            date_trunc('day', m.timestamp) = series.bucket AND 
+            m.device_id = :device_id
+        GROUP BY series.bucket
+        ORDER BY series.bucket DESC
+    """)
+
+    results = db.execute(sql, {
+        "start_time": start_time,
+        "now": now,
+        "interval": interval,
+        "device_id": device_id
+    }).all()
+
+    # Use a dummy ID for the bucketed results
+    return [
+        MetricOut(
+            id=0,
+            device_id=device_id,
+            timestamp=r.bucket,
+            cpu_usage=float(r.cpu_usage or 0),
+            memory_usage=float(r.memory_usage or 0),
+            latency=float(r.latency or 0),
+            traffic=float(r.traffic or 0)
+        )
+        for r in results
+    ]
 
 

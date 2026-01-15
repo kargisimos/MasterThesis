@@ -3,6 +3,7 @@ import asyncio
 import redis
 from typing import Optional
 from services.websocket_manager import manager
+from config import settings
 
 
 class RedisService:
@@ -111,5 +112,4 @@ class RedisService:
             await self.subscribe_and_forward()
 
 
-# Global Redis service instance
-redis_service = RedisService()
+redis_service = RedisService(host=settings.REDIS_HOST, port=settings.REDIS_PORT)

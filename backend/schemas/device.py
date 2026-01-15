@@ -36,6 +36,9 @@ class DeviceOut(DeviceBase):
     last_memory: Optional[float] = None
     last_traffic: Optional[float] = None
     last_polled: Optional[datetime] = None
+    last_error: Optional[str] = None
+    failing_protocols: Optional[str] = None
+    configured_credentials: list[str] = []
 
     class Config:
         orm_mode = True
