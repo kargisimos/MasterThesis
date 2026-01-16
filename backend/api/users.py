@@ -77,6 +77,9 @@ def update_user(
             user.role = user_update.role
         if user_update.is_active is not None:
             user.is_active = user_update.is_active
+    
+    if user_update.receive_email_notifications is not None:
+        user.receive_email_notifications = user_update.receive_email_notifications
 
     db.add(user)
     db.commit()

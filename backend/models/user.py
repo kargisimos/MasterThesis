@@ -16,3 +16,4 @@ class User(Base):
     hashed_password = Column(String, nullable=False)
     role = Column(String, default = "viewer", nullable = False)
     is_active = Column(Boolean, default=True)
+    receive_email_notifications = Column(Boolean, default=False)

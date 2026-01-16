@@ -82,6 +82,32 @@ export default function Settings() {
         </section>
 
         <section style={{ marginBottom: "30px" }}>
+        <h2>Notifications</h2>
+        <div style={{ display: "flex", alignItems: "center", gap: "12px", background: "rgba(0,0,0,0.02)", padding: "15px", borderRadius: "10px" }}>
+            <div style={{ flex: 1 }}>
+                <div style={{ fontWeight: "600", marginBottom: "4px" }}>Critical Alerts via Email</div>
+                <div style={{ fontSize: "0.85rem", color: "var(--text-muted)" }}>Receive email for host downtime, auth failures, and critical load (&gt;90%)</div>
+            </div>
+            <label className="switch">
+                <input 
+                    type="checkbox" 
+                    checked={profile?.receive_email_notifications || false} 
+                    onChange={async (e) => {
+                        const val = e.target.checked;
+                        try {
+                            await api.patch(`/users/${profile.id}`, { receive_email_notifications: val });
+                            setProfile({ ...profile, receive_email_notifications: val });
+                        } catch (err) {
+                            console.error("Failed to update notification settings", err);
+                        }
+                    }}
+                />
+                <span className="slider round"></span>
+            </label>
+        </div>
+        </section>
+
+        <section style={{ marginBottom: "30px" }}>
         <h2>Security</h2>
         <button className="add-device-btn" onClick={() => setShowPasswordModal(true)}>
             Change Password

@@ -23,6 +23,12 @@ class Settings(BaseSettings):
     POLLING_INTERVAL: int
     REDIS_HOST: str
     REDIS_PORT: int
+    
+    SMTP_HOST: str
+    SMTP_PORT: int
+    SMTP_USER: str
+    SMTP_PASSWORD: str
+    EMAIL_FROM: str
 
 
     class Config:

@@ -10,7 +10,7 @@ from sqlalchemy.orm import Session
 
 from models.device import Device, DeviceMetric, DeviceCredential
 from database import SessionLocal
-from services.alerting import check_for_alerts
+from services.alerting import check_for_alerts, notify_users
 from services.encryptor import decrypt_value
 from services.websocket_manager import manager
 from services.redis_service import redis_service
@@ -143,12 +143,13 @@ async def collect_ssh_data(ip: str, username: str, password: str):
     except Exception:
         return "ERROR", None, None
 
-async def poll_device(device_id: int):
+async def poll_device(device_id: int) -> list[str]:
     """Independent polling task with its own DB session"""
     db = SessionLocal()
+    device_alerts = []
     try:
         device = db.query(Device).filter(Device.id == device_id).first()
-        if not device: return
+        if not device: return []
 
         is_online, latency = await ping_device(device.ip_address)
         cpu, memory, traffic, poll_error = None, None, None, None
@@ -215,7 +216,9 @@ async def poll_device(device_id: int):
             db.add(DeviceMetric(device_id=device.id, cpu_usage=cpu, memory_usage=memory, traffic=traffic, latency=latency))
         
         db.commit()
-        check_for_alerts(db, device)
+        
+        # Collect alerts for this device
+        device_alerts = await check_for_alerts(db, device)
         
         # Real-time Broadcast
         payload = {
@@ -230,11 +233,13 @@ async def poll_device(device_id: int):
         
         await manager.broadcast({"type": "device_update", "device": payload})
         await redis_service.publish_device_update(payload)
+        
     except Exception as e:
         print(f"Poll error {device_id}: {e}")
         db.rollback()
     finally:
         db.close()
+        return device_alerts or []
 
 async def run_monitoring_cycle():
     db = SessionLocal()
@@ -245,6 +250,19 @@ async def run_monitoring_cycle():
             return
             
         tasks = [poll_device(did) for did in device_ids]
-        await asyncio.gather(*tasks)
+        results = await asyncio.gather(*tasks)
+        
+        # Aggregate alerts from all devices
+        global_alerts = []
+        for alerts in results:
+            if alerts:
+                global_alerts.extend(alerts)
+        
+        # Send single aggregated email if there are alerts
+        if global_alerts:
+            subject = "Network Device Monitoring System"
+            body = "The following critical alerts were reported:\n\n" + "\n\n".join(global_alerts)
+            await notify_users(subject, body)
+            
     finally:
         db.close()

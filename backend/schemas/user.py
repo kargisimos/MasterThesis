@@ -19,6 +19,7 @@ class UserOut(BaseModel):
     full_name: Optional[str]
     role: str
     is_active: bool
+    receive_email_notifications: bool
 
     class Config:
         orm_mode = True
@@ -28,6 +29,7 @@ class UserUpdate(BaseModel):
     email: Optional[str] = None
     role: Optional[UserRole] = None
     is_active: Optional[bool] = None
+    receive_email_notifications: Optional[bool] = None
 
 class Token(BaseModel):
     access_token: str

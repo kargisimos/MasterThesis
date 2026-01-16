@@ -149,14 +149,16 @@ export default function Dashboard() {
         try {
           const failing = JSON.parse(d.failing_protocols || "[]");
           failing.forEach(protocol => {
-            // ONLY show alert if the protocol is actually configured
             const isConfigured = d.configured_credentials?.includes(protocol.toLowerCase());
             if (!isConfigured) return;
 
             const isAuth = d.last_error?.toLowerCase().includes("auth failed");
+            const isCriticalProtocol = protocol.toLowerCase().includes("ssh") || protocol.toLowerCase().includes("snmp");
+            const priority = (isAuth || isCriticalProtocol) ? "critical" : "warning";
+
             triggers.push({ 
               id: `fail-${protocol}-${d.id}`, 
-              priority: isAuth ? "critical" : "warning", 
+              priority: priority, 
               msg: `${d.name}: ${protocol.toUpperCase()} ${isAuth ? 'Auth Failed' : 'Polling Error'}`, 
               time: "Action Required" 
             });
@@ -165,8 +167,12 @@ export default function Dashboard() {
           console.error("Failed to parse failing protocols:", e);
         }
 
-        if (d.last_cpu > 80) triggers.push({ id: `cpu-${d.id}`, priority: "critical", msg: `${d.name}: Critical CPU Usage (${d.last_cpu}%)`, time: "Recent" });
-        if (d.last_memory > 85) triggers.push({ id: `mem-${d.id}`, priority: "warning", msg: `${d.name}: High Memory Usage (${d.last_memory}%)`, time: "Recent" });
+        if (d.last_cpu > 90) triggers.push({ id: `cpu-${d.id}`, priority: "critical", msg: `${d.name}: Critical CPU Usage (${d.last_cpu}%)`, time: "Recent" });
+        else if (d.last_cpu > 70) triggers.push({ id: `cpu-${d.id}`, priority: "warning", msg: `${d.name}: High CPU Usage (${d.last_cpu}%)`, time: "Recent" });
+        
+        if (d.last_memory > 90) triggers.push({ id: `mem-${d.id}`, priority: "critical", msg: `${d.name}: Critical Memory Usage (${d.last_memory}%)`, time: "Recent" });
+        else if (d.last_memory > 70) triggers.push({ id: `mem-${d.id}`, priority: "warning", msg: `${d.name}: High Memory Usage (${d.last_memory}%)`, time: "Recent" });
+        
         if (d.last_latency > 40) triggers.push({ id: `lat-${d.id}`, priority: "warning", msg: `${d.name}: High Latency (${d.last_latency}ms)`, time: "Recent" });
       }
     });
@@ -184,13 +190,13 @@ export default function Dashboard() {
   const getMetricColor = (type, value) => {
     if (value === null || value === undefined) return "var(--text-muted)";
     if (type === "cpu") {
-      if (value > 80) return "#ef4444";
-      if (value > 60) return "#f59e0b";
+      if (value > 90) return "#ef4444";
+      if (value > 80) return "#f59e0b";
       return "#10b981";
     }
     if (type === "mem") {
-      if (value > 85) return "#ef4444";
-      if (value > 70) return "#f59e0b";
+      if (value > 90) return "#ef4444";
+      if (value > 85) return "#f59e0b";
       return "#10b981";
     }
     if (type === "lat") {
