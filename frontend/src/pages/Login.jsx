@@ -30,8 +30,8 @@ export default function Login() {
       localStorage.setItem("refresh_token", data.refresh_token);
       sessionStorage.removeItem("login_error");
       navigate("/dashboard");
-    } catch {
-      const msg = "Invalid username or password.";
+    } catch (err) {
+      const msg = err.response?.data?.detail || "Invalid username or password.";
       setError(msg);
       sessionStorage.setItem("login_error", msg);
     }

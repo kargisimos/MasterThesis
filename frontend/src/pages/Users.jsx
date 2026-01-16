@@ -18,6 +18,7 @@ export default function Users() {
     full_name: "",
     password: "",
     role: "viewer",
+    is_active: true,
   });
 
   let currentUserEmail = null;
@@ -56,7 +57,9 @@ export default function Users() {
     try {
       await api.post("/auth/register", newUser);
       setShowAddModal(false);
-      setNewUser({ email: "", full_name: "", password: "", role: "viewer" });
+      setShowAddModal(false);
+      setNewUser({ email: "", full_name: "", password: "", role: "viewer", is_active: true });
+      fetchUsers();
       fetchUsers();
       showSuccess("User created successfully!");
     } catch {
@@ -147,7 +150,7 @@ export default function Users() {
             <th>Email</th>
             <th>Full Name</th>
             <th>Role</th>
-            <th>Active</th>
+            <th>Status</th>
             <th>Actions</th>
           </tr>
         </thead>
@@ -158,7 +161,18 @@ export default function Users() {
               <td>{user.email}</td>
               <td>{user.full_name}</td>
               <td>{user.role}</td>
-              <td>{user.is_active ? "Yes" : "No"}</td>
+              <td style={{ textAlign: "center" }}>
+                <span style={{ 
+                  padding: "4px 8px", 
+                  borderRadius: "12px", 
+                  backgroundColor: user.is_active ? "#d1fae5" : "#f3f4f6", 
+                  color: user.is_active ? "#065f46" : "#6b7280",
+                  fontSize: "0.75rem",
+                  fontWeight: "600"
+                }}>
+                  {user.is_active ? "ACTIVE" : "INACTIVE"}
+                </span>
+              </td>
               <td>
                 <button onClick={() => setEditingUser({ ...user })}>
                   Edit
@@ -224,6 +238,13 @@ export default function Users() {
                   <option key={r}>{r}</option>
                 ))}
               </select>
+              <select
+                value={newUser.is_active ? "Active" : "Inactive"}
+                onChange={(e) => setNewUser({ ...newUser, is_active: e.target.value === "Active" })}
+              >
+                <option value="Active">Active</option>
+                <option value="Inactive">Inactive</option>
+              </select>
               <button type="submit">Create</button>
               <button type="button" onClick={() => setShowAddModal(false)}>
                 Cancel
@@ -269,16 +290,16 @@ export default function Users() {
                 ))}
               </select>
               <select
-                value={editingUser.is_active}
+                value={editingUser.is_active ? "Active" : "Inactive"}
                 onChange={(e) =>
                   setEditingUser({
                     ...editingUser,
-                    is_active: e.target.value === "true",
+                    is_active: e.target.value === "Active",
                   })
                 }
               >
-                <option value="true">Active</option>
-                <option value="false">Inactive</option>
+                <option value="Active">Active</option>
+                <option value="Inactive">Inactive</option>
               </select>
               <button type="submit">Save</button>
               <button type="button" onClick={() => setEditingUser(null)}>

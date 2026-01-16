@@ -180,8 +180,8 @@ export default function Dashboard() {
   }, [devices]);
 
   const totalDevices = devices.length;
-  const onlineCount = devices.filter(d => d.last_status === "online").length;
-  const activeDevices = devices.filter(d => d.last_status === "online");
+  const onlineCount = devices.filter(d => d.is_active && d.last_status === "online").length;
+  const activeDevices = devices.filter(d => d.is_active && d.last_status === "online");
   const avgCPU = (activeDevices.reduce((acc, d) => acc + (Number(d.last_cpu) || 0), 0) / onlineCount || 0);
   const avgMemory = (activeDevices.reduce((acc, d) => acc + (Number(d.last_memory) || 0), 0) / onlineCount || 0);
   const avgLatency = (activeDevices.reduce((acc, d) => acc + (Number(d.last_latency) || 0), 0) / onlineCount || 0);
@@ -472,7 +472,15 @@ export default function Dashboard() {
       <h2 style={{ fontSize: "1.25rem", margin: "32px 0 20px" }}>Active Network Inventory</h2>
       <div className="device-metrics">
         {devices.map(device => (
-          <div key={device.id} className="device-card" onClick={() => userRole !== "viewer" && setDeviceModal(device)}>
+          <div 
+            key={device.id} 
+            className="device-card" 
+            onClick={() => userRole !== "viewer" && setDeviceModal(device)}
+            style={{ 
+              filter: device.is_active ? "none" : "grayscale(100%) opacity(0.5)",
+              cursor: device.is_active ? "pointer" : "default" 
+            }}
+          >
             <div style={{ display: "flex", justifyContent: "space-between", marginBottom: "8px" }}>
               <h4 style={{ margin: 0 }}>{device.name}</h4>
               <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>

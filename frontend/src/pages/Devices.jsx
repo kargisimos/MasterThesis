@@ -21,6 +21,7 @@ export default function Devices() {
     type: "Router",
     location: "",
     notes: "",
+    is_active: true,
   });
 
   const [credType, setCredType] = useState("ssh");
@@ -56,7 +57,7 @@ export default function Devices() {
     try {
       await DeviceService.create(newDevice);
       setShowAddModal(false);
-      setNewDevice({ name: "", ip_address: "", type: "Router", location: "", notes: "" });
+      setNewDevice({ name: "", ip_address: "", type: "Router", location: "", notes: "", is_active: true });
       fetchDevices();
       showSuccess("Device created successfully!");
     } catch {
@@ -159,6 +160,7 @@ export default function Devices() {
             <th>Type</th>
             <th>Location</th>
             <th>Notes</th>
+            <th>Status</th>
             <th>Actions</th>
           </tr>
         </thead>
@@ -171,6 +173,18 @@ export default function Devices() {
               <td>{device.location || "-"}</td>
               <td className="notes" title={device.notes || "-"}>
                 {device.notes || "-"}
+              </td>
+              <td style={{ textAlign: "center" }}>
+                <span style={{ 
+                  padding: "4px 8px", 
+                  borderRadius: "12px", 
+                  backgroundColor: device.is_active ? "#d1fae5" : "#f3f4f6", 
+                  color: device.is_active ? "#065f46" : "#6b7280",
+                  fontSize: "0.75rem",
+                  fontWeight: "600"
+                }}>
+                  {device.is_active ? "ACTIVE" : "INACTIVE"}
+                </span>
               </td>
               <td>
                 <button onClick={() => setEditingDevice({ ...device })}>Edit</button>
@@ -202,6 +216,15 @@ export default function Devices() {
               </select>
               <input placeholder="Location" value={newDevice.location} onChange={(e) => setNewDevice({ ...newDevice, location: e.target.value })} />
               <input placeholder="Notes" value={newDevice.notes} onChange={(e) => setNewDevice({ ...newDevice, notes: e.target.value })} />
+              
+              <select 
+                value={newDevice.is_active ? "Active" : "Inactive"} 
+                onChange={(e) => setNewDevice({ ...newDevice, is_active: e.target.value === "Active" })}
+              >
+                <option value="Active">Active</option>
+                <option value="Inactive">Inactive</option>
+              </select>
+
               <button type="submit">Create</button>
               <button type="button" onClick={() => setShowAddModal(false)}>Cancel</button>
             </form>
@@ -221,6 +244,15 @@ export default function Devices() {
               </select>
               <input value={editingDevice.location || ""} onChange={(e) => setEditingDevice({ ...editingDevice, location: e.target.value })} />
               <input value={editingDevice.notes || ""} onChange={(e) => setEditingDevice({ ...editingDevice, notes: e.target.value })} />
+              
+              <select 
+                value={editingDevice.is_active ? "Active" : "Inactive"} 
+                onChange={(e) => setEditingDevice({ ...editingDevice, is_active: e.target.value === "Active" })}
+              >
+                <option value="Active">Active</option>
+                <option value="Inactive">Inactive</option>
+              </select>
+
               <button type="submit">Save</button>
               <button type="button" onClick={() => setEditingDevice(null)}>Cancel</button>
             </form>

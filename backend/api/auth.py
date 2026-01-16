@@ -36,6 +36,12 @@ def login(
             detail="Invalid email or password",
         )
 
+    if not db_user.is_active:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="User account is inactive",
+        )
+
     access_token = create_access_token(
         {"sub": db_user.email, "role": db_user.role}
     )
