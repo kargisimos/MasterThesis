@@ -1,41 +1,25 @@
-:root {
-  --primary: #3b82f6;
-  --primary-hover: #2563eb;
-  --secondary: #64748b;
-  --success: #10b981;
-  --danger: #ef4444;
-  --warning: #f59e0b;
-  --bg-main: #f8fafc;
-  --bg-card: rgba(255, 255, 255, 1);
-  --sidebar-bg: #0f172a;
-  --text-main: #1e293b;
-  --text-muted: #64748b;
-  --radius: 12px;
-  --shadow: 0 4px 6px -1px rgb(0 0 0 / 0.1), 0 2px 4px -2px rgb(0 0 0 / 0.1);
-  --shadow-lg: 0 10px 15px -3px rgb(0 0 0 / 0.1), 0 4px 6px -4px rgb(0 0 0 / 0.1);
-  --critical: #ef4444;
-  --warning: #f59e0b;
-  --info: #3b82f6;
-  --success-muted: rgba(16, 185, 129, 0.1);
-}
+/* :root variables moved to index.css */
 
 .dashboard-container {
   display: flex;
   min-height: 100vh;
   font-family: 'Inter', system-ui, -apple-system, sans-serif;
-  background-color: var(--bg-main);
-  color: var(--text-main);
+  background-color: var(--bg-color);
+  color: var(--text-color);
 }
 
 .dashboard-sidebar {
   width: 260px;
   background-color: var(--sidebar-bg);
   color: white;
+  /* Sidebar usually keeps white text even in light mode if bg is dark, but check vars */
   padding: 30px 20px;
   display: flex;
   flex-direction: column;
   box-shadow: 4px 0 10px rgba(0, 0, 0, 0.1);
 }
+
+/* ... logo ... */
 
 .dashboard-logo {
   font-size: 1.25rem;
@@ -61,6 +45,7 @@
 
 .dashboard-menu a {
   color: #94a3b8;
+  /* Keep specific sidebar text color */
   text-decoration: none;
   font-weight: 500;
   padding: 12px 16px;
@@ -99,39 +84,42 @@
   flex-direction: column;
   align-items: center;
   overflow-y: auto;
+  background-color: var(--bg-color);
 }
 
 /* Original Shared Styles (Restored) */
 .dashboard-card {
-  background-color: white;
+  background-color: var(--card-bg);
   padding: 40px;
-  border-radius: var(--radius);
-  box-shadow: var(--shadow);
+  border-radius: 12px;
+  box-shadow: var(--card-shadow);
   min-width: 400px;
   max-width: 1200px;
   width: 100%;
   margin-bottom: 20px;
+  color: var(--text-color);
 }
 
 .dashboard-card h1,
 .dashboard-card h2,
 .dashboard-card h3 {
   margin-bottom: 20px;
-  color: var(--text-main);
+  color: var(--text-color);
 }
 
 .data-table {
   width: 100%;
   border-collapse: collapse;
-  background: white;
+  background: var(--card-bg);
   border-radius: 8px;
   overflow: hidden;
   font-size: 14px;
   table-layout: fixed;
+  color: var(--text-color);
 }
 
 .data-table thead {
-  background-color: #f8fafc;
+  background-color: var(--table-header-bg);
 }
 
 .data-table th {
@@ -139,34 +127,34 @@
   padding: 12px;
   font-weight: 600;
   color: var(--text-muted);
-  border-bottom: 1px solid #e2e8f0;
+  border-bottom: 1px solid var(--table-border);
 }
 
 .data-table td {
   padding: 12px;
-  border-bottom: 1px solid #f1f5f9;
+  border-bottom: 1px solid var(--table-border);
   vertical-align: middle;
   overflow-wrap: anywhere;
 }
 
 .data-table tbody tr:hover {
-  background-color: #f8fafc;
+  background-color: var(--table-row-hover);
 }
 
 .data-table button {
   padding: 6px 12px;
   font-size: 13px;
   border-radius: 6px;
-  border: 1px solid #e2e8f0;
+  border: 1px solid var(--table-border);
   cursor: pointer;
-  background-color: white;
-  color: var(--text-main);
+  background-color: var(--card-bg);
+  color: var(--text-color);
   margin-right: 6px;
   transition: all 0.2s;
 }
 
 .data-table button:hover {
-  background-color: #f1f5f9;
+  background-color: var(--bg-color);
 }
 
 .data-table button.danger {
@@ -201,7 +189,7 @@
 }
 
 .modal {
-  background: white;
+  background: var(--card-bg);
   padding: 32px;
   border-radius: 20px;
   box-shadow: var(--shadow-lg);
@@ -209,6 +197,8 @@
   max-width: 800px;
   max-height: 90vh;
   overflow-y: auto;
+  color: var(--text-color);
+  border: 1px solid var(--card-border);
 }
 
 .modal input,
@@ -217,7 +207,9 @@
   padding: 10px 14px;
   margin-bottom: 16px;
   border-radius: 8px;
-  border: 1px solid #e2e8f0;
+  border: 1px solid var(--input-border);
+  background: var(--input-bg);
+  color: var(--input-text);
   font-size: 14px;
   outline: none;
 }
@@ -243,8 +235,9 @@
 }
 
 .modal button[type="button"] {
-  background-color: #f1f5f9;
-  color: var(--text-main);
+  background-color: var(--bg-color);
+  color: var(--text-color);
+  border: 1px solid var(--input-border);
 }
 
 /* Dashboard Specific (Keep Perfected) */
@@ -261,12 +254,13 @@
 }
 
 .dashboard-summary-card {
-  background: white;
+  background: var(--card-bg);
   padding: 24px;
   border-radius: var(--radius);
   box-shadow: var(--shadow);
-  border: 1px solid #f1f5f9;
+  border: 1px solid var(--card-border);
   transition: transform 0.2s;
+  color: var(--text-color);
 }
 
 .dashboard-summary-card:hover {
@@ -281,10 +275,12 @@
 }
 
 .dashboard-chart-card {
-  background: white;
+  background: var(--card-bg);
   padding: 24px;
   border-radius: var(--radius);
   box-shadow: var(--shadow);
+  border: 1px solid var(--card-border);
+  color: var(--text-color);
 }
 
 .chart-container {
@@ -300,12 +296,13 @@
 }
 
 .device-card {
-  background: white;
+  background: var(--card-bg);
   padding: 24px;
   border-radius: var(--radius);
   box-shadow: var(--shadow);
-  border: 1px solid #f1f5f9;
+  border: 1px solid var(--card-border);
   transition: all 0.2s;
+  color: var(--text-color);
 }
 
 .device-card:hover {
@@ -354,8 +351,9 @@
   align-items: center;
   padding: 12px 16px;
   border-radius: 8px;
-  background: #f8fafc;
+  background: var(--bg-color);
   border-left: 4px solid var(--secondary);
+  color: var(--text-color);
 }
 
 .trigger-item.critical {
@@ -408,7 +406,8 @@
   font-weight: 600;
   padding: 4px 8px;
   border-radius: 6px;
-  background: #f1f5f9;
+  background: var(--input-bg);
+  color: var(--text-color);
 }
 
 .latency-indicator {
@@ -441,8 +440,8 @@
   font-size: 0.7rem;
   padding: 2px 6px;
   border-radius: 4px;
-  background: #e2e8f0;
-  color: #475569;
+  background: var(--input-border);
+  color: var(--text-muted);
 }
 
 .service-badge.up {

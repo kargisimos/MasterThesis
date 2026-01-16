@@ -129,11 +129,11 @@ export default function Devices() {
       {message && (
         <div style={{ 
           padding: "12px 16px", 
-          backgroundColor: "#ecfdf5", 
-          color: "#065f46", 
+          backgroundColor: "var(--success-muted)", 
+          color: "var(--success-text)", 
           borderRadius: "8px", 
           marginBottom: "16px",
-          border: "1px solid #10b981",
+          border: "1px solid var(--success)",
           fontWeight: "500",
           animation: "fadeIn 0.3s ease-out"
         }}>

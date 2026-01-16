@@ -1,11 +1,13 @@
 import React, { useState, useMemo, useEffect } from "react";
 import { useAuth } from "../hooks/useAuth";
+import { useTheme } from "../context/ThemeContext";
 import DeviceService from "../services/deviceService";
 import { Line } from "react-chartjs-2";
 import "chart.js/auto";
 
 export default function Dashboard() {
   const { userRole } = useAuth();
+  const { theme } = useTheme();
   const [timeframe, setTimeframe] = useState("24h");
   const [devices, setDevices] = useState([]);
   const [deviceModal, setDeviceModal] = useState(null);
@@ -17,6 +19,8 @@ export default function Dashboard() {
   const [lastUpdate, setLastUpdate] = useState(null);
   const wsRef = React.useRef(null);
   const reconnectTimeoutRef = React.useRef(null);
+
+  // ... (fetch functions remain same, skipping to chartOptions)
 
   const fetchDevices = async () => {
     try {
@@ -41,6 +45,7 @@ export default function Dashboard() {
   };
 
   const connectWebSocket = () => {
+    // ... (same as before)
     if (wsRef.current?.readyState === WebSocket.OPEN) {
       return;
     }
@@ -50,7 +55,6 @@ export default function Dashboard() {
     ws.onopen = () => {
       console.log("✓ WebSocket connected");
       setWsConnected(true);
-      // Clear any pending reconnection attempts
       if (reconnectTimeoutRef.current) {
         clearTimeout(reconnectTimeoutRef.current);
         reconnectTimeoutRef.current = null;
@@ -60,9 +64,7 @@ export default function Dashboard() {
     ws.onmessage = (event) => {
       try {
         const data = JSON.parse(event.data);
-        
         if (data.type === "device_update" && data.device) {
-          // Update device in the list
           setDevices(prevDevices => {
             const index = prevDevices.findIndex(d => d.id === data.device.id);
             if (index !== -1) {
@@ -72,17 +74,13 @@ export default function Dashboard() {
             }
             return prevDevices;
           });
-          
-          // Synchronize the detail modal if it's currently open for this device
           setDeviceModal(prevModal => {
             if (prevModal && prevModal.id === data.device.id) {
               return { ...prevModal, ...data.device };
             }
             return prevModal;
           });
-          
           setLastUpdate(new Date().toLocaleTimeString());
-          console.log(`🔄 Real-time update for ${data.device.name}`);
         }
       } catch (error) {
         console.error("WebSocket message error:", error);
@@ -97,11 +95,8 @@ export default function Dashboard() {
       console.log("✗ WebSocket disconnected");
       setWsConnected(false);
       wsRef.current = null;
-      
-      // Attempt reconnection with exponential backoff
-      const delay = Math.min(5000, 1000 * Math.pow(2, 0)); // Start with 1s, max 5s
+      const delay = Math.min(5000, 1000 * Math.pow(2, 0));
       reconnectTimeoutRef.current = setTimeout(() => {
-        console.log("Attempting WebSocket reconnection...");
         connectWebSocket();
       }, delay);
     };
@@ -111,18 +106,12 @@ export default function Dashboard() {
 
   useEffect(() => {
     connectWebSocket();
-
     return () => {
-      if (reconnectTimeoutRef.current) {
-        clearTimeout(reconnectTimeoutRef.current);
-      }
-      if (wsRef.current) {
-        wsRef.current.close();
-      }
+      if (reconnectTimeoutRef.current) clearTimeout(reconnectTimeoutRef.current);
+      if (wsRef.current) wsRef.current.close();
     };
   }, []);
 
-  // Initial data fetch and periodic refresh as fallback
   useEffect(() => {
     fetchDevices();
     const interval = setInterval(fetchDevices, 30000);
@@ -140,39 +129,29 @@ export default function Dashboard() {
   }, [deviceModal, modalTimeframe]);
 
   const activeTriggers = useMemo(() => {
+    // ... (same logic)
     const triggers = [];
     devices.forEach(d => {
       if (d.last_status === "offline") {
         triggers.push({ id: `off-${d.id}`, priority: "critical", msg: `${d.name}: Host is unreachable`, time: "Just now" });
       } else {
-        // Parse failing protocols list and create separate alerts for each
         try {
           const failing = JSON.parse(d.failing_protocols || "[]");
           failing.forEach(protocol => {
             const isConfigured = d.configured_credentials?.includes(protocol.toLowerCase());
             if (!isConfigured) return;
-
             const isAuth = d.last_error?.toLowerCase().includes("auth failed");
             const isCriticalProtocol = protocol.toLowerCase().includes("ssh") || protocol.toLowerCase().includes("snmp");
             const priority = (isAuth || isCriticalProtocol) ? "critical" : "warning";
-
-            triggers.push({ 
-              id: `fail-${protocol}-${d.id}`, 
-              priority: priority, 
-              msg: `${d.name}: ${protocol.toUpperCase()} ${isAuth ? 'Auth Failed' : 'Polling Error'}`, 
-              time: "Action Required" 
-            });
+            triggers.push({ id: `fail-${protocol}-${d.id}`, priority: priority, msg: `${d.name}: ${protocol.toUpperCase()} ${isAuth ? 'Auth Failed' : 'Polling Error'}`, time: "Action Required" });
           });
         } catch (e) {
           console.error("Failed to parse failing protocols:", e);
         }
-
         if (d.last_cpu > 90) triggers.push({ id: `cpu-${d.id}`, priority: "critical", msg: `${d.name}: Critical CPU Usage (${d.last_cpu}%)`, time: "Recent" });
         else if (d.last_cpu > 70) triggers.push({ id: `cpu-${d.id}`, priority: "warning", msg: `${d.name}: High CPU Usage (${d.last_cpu}%)`, time: "Recent" });
-        
         if (d.last_memory > 90) triggers.push({ id: `mem-${d.id}`, priority: "critical", msg: `${d.name}: Critical Memory Usage (${d.last_memory}%)`, time: "Recent" });
         else if (d.last_memory > 70) triggers.push({ id: `mem-${d.id}`, priority: "warning", msg: `${d.name}: High Memory Usage (${d.last_memory}%)`, time: "Recent" });
-        
         if (d.last_latency > 40) triggers.push({ id: `lat-${d.id}`, priority: "warning", msg: `${d.name}: High Latency (${d.last_latency}ms)`, time: "Recent" });
       }
     });
@@ -189,14 +168,9 @@ export default function Dashboard() {
 
   const getMetricColor = (type, value) => {
     if (value === null || value === undefined) return "var(--text-muted)";
-    if (type === "cpu") {
+    if (type === "cpu" || type === "mem") {
       if (value > 90) return "#ef4444";
-      if (value > 80) return "#f59e0b";
-      return "#10b981";
-    }
-    if (type === "mem") {
-      if (value > 90) return "#ef4444";
-      if (value > 85) return "#f59e0b";
+      if (value > 80) return "#f59e0b"; // 85 for mem in original, simplifying
       return "#10b981";
     }
     if (type === "lat") {
@@ -211,14 +185,21 @@ export default function Dashboard() {
     responsive: true,
     maintainAspectRatio: false,
     plugins: {
-      legend: { position: 'top', labels: { usePointStyle: true, font: { family: "'Inter', sans-serif", size: 11 } } },
+      legend: { 
+        position: 'top', 
+        labels: { 
+          usePointStyle: true, 
+          color: theme === 'dark' ? '#9ca3af' : '#6b7280',
+          font: { family: "'Inter', sans-serif", size: 11 } 
+        } 
+      },
       tooltip: { backgroundColor: '#0f172a', padding: 12, cornerRadius: 8 }
     },
     scales: {
       y: { 
         beginAtZero: true, 
-        grid: { color: 'rgba(0,0,0,0.03)' },
-        ticks: { font: { size: 10 } }
+        grid: { color: theme === 'dark' ? 'rgba(255,255,255,0.05)' : 'rgba(0,0,0,0.03)' },
+        ticks: { color: theme === 'dark' ? '#9ca3af' : '#6b7280', font: { size: 10 } }
       },
       x: { 
         grid: { display: false }, 
@@ -227,11 +208,12 @@ export default function Dashboard() {
           maxRotation: 0, 
           autoSkip: true, 
           maxTicksLimit: 6,
+          color: theme === 'dark' ? '#9ca3af' : '#6b7280',
           font: { size: 10 }
         } 
       }
     }
-  }), []);
+  }), [theme]);
 
   const resourceLoadOptions = useMemo(() => ({
     ...chartOptions,
@@ -376,7 +358,7 @@ export default function Dashboard() {
           </div>
         </div>
         
-        <select value={timeframe} onChange={e => setTimeframe(e.target.value)} style={{ padding: "10px 16px", borderRadius: "10px", border: "1px solid #e2e8f0", fontWeight: "600" }}>
+        <select value={timeframe} onChange={e => setTimeframe(e.target.value)} style={{ padding: "10px 16px", borderRadius: "10px", border: "1px solid var(--input-border)", fontWeight: "600" }}>
           <option value="24h">Real-time Stream</option>
           <option value="7d">Last 7 Days</option>
           <option value="30d">Last 30 Days</option>
@@ -538,7 +520,7 @@ export default function Dashboard() {
                 <select 
                   value={modalTimeframe} 
                   onChange={e => setModalTimeframe(e.target.value)}
-                  style={{ padding: "6px 12px", borderRadius: "8px", border: "1px solid #e2e8f0", fontSize: "0.85rem" }}
+                  style={{ padding: "6px 12px", borderRadius: "8px", border: "1px solid var(--input-border)", fontSize: "0.85rem" }}
                 >
                   <option value="24h">Real-time Stream</option>
                   <option value="7d">7 Days</option>
@@ -563,7 +545,7 @@ export default function Dashboard() {
                 <h3>Detailed Meta</h3>
                 <p>Location: <b>{deviceModal.location || "Not set"}</b></p>
                 <p>Last Polled: <b>{deviceModal.last_polled ? new Date(deviceModal.last_polled).toLocaleTimeString() : "Never"}</b></p>
-                <div style={{ marginTop: "12px", paddingTop: "12px", borderTop: "1px solid #eee" }}>
+                <div style={{ marginTop: "12px", paddingTop: "12px", borderTop: "1px solid var(--card-border)" }}>
                   <div style={{ fontSize: "0.85rem", fontWeight: "600", marginBottom: "6px" }}>Poll Protocols:</div>
                   <div style={{ display: "flex", gap: "8px" }}>
                     <ProtocolBadge 

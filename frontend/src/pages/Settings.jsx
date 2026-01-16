@@ -1,9 +1,11 @@
 import React, { useEffect, useState } from "react";
 import api from "../services/api";
 import { useAuth } from "../hooks/useAuth";
+import { useTheme } from "../context/ThemeContext";
 
 export default function Settings() {
   const { userRole } = useAuth();
+  const { theme, toggleTheme } = useTheme();
   let decodedToken = null;
   const accessToken = localStorage.getItem("access_token");
   if (accessToken) {
@@ -82,8 +84,26 @@ export default function Settings() {
         </section>
 
         <section style={{ marginBottom: "30px" }}>
+        <h2>Interface</h2>
+        <div style={{ display: "flex", alignItems: "center", gap: "12px", background: "var(--bg-color)", padding: "15px", borderRadius: "10px", border: "1px solid var(--card-border)" }}>
+            <div style={{ flex: 1 }}>
+                <div style={{ fontWeight: "600", marginBottom: "4px" }}>Dark Mode</div>
+                <div style={{ fontSize: "0.85rem", color: "var(--text-muted)" }}>Switch between light and dark themes</div>
+            </div>
+            <label className="switch">
+                <input 
+                    type="checkbox" 
+                    checked={theme === "dark"} 
+                    onChange={toggleTheme}
+                />
+                <span className="slider round"></span>
+            </label>
+        </div>
+        </section>
+
+        <section style={{ marginBottom: "30px" }}>
         <h2>Notifications</h2>
-        <div style={{ display: "flex", alignItems: "center", gap: "12px", background: "rgba(0,0,0,0.02)", padding: "15px", borderRadius: "10px" }}>
+        <div style={{ display: "flex", alignItems: "center", gap: "12px", background: "var(--bg-color)", padding: "15px", borderRadius: "10px", border: "1px solid var(--card-border)" }}>
             <div style={{ flex: 1 }}>
                 <div style={{ fontWeight: "600", marginBottom: "4px" }}>Critical Alerts via Email</div>
                 <div style={{ fontSize: "0.85rem", color: "var(--text-muted)" }}>Receive email for host downtime, auth failures, and critical load (&gt;90%)</div>
@@ -169,7 +189,7 @@ export default function Settings() {
                 <p
                 style={{
                     marginTop: "10px",
-                    color: message.includes("success") ? "green" : "red",
+                    color: message.includes("success") ? "var(--success)" : "var(--danger)",
                 }}
                 >
                 {message}
