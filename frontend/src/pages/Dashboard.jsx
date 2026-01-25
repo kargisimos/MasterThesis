@@ -20,8 +20,6 @@ export default function Dashboard() {
   const wsRef = React.useRef(null);
   const reconnectTimeoutRef = React.useRef(null);
 
-  // ... (fetch functions remain same, skipping to chartOptions)
-
   const fetchDevices = async () => {
     try {
       const data = await DeviceService.getAll();
@@ -35,6 +33,36 @@ export default function Dashboard() {
     }
   };
 
+  const handleExport = (type, deviceId = null) => {
+    const baseUrl = "http://localhost:8000/devices";
+    const token = localStorage.getItem("access_token");
+    let url = "";
+    
+    if (deviceId) {
+      url = `${baseUrl}/${deviceId}/history/export?format=${type}`;
+    } else {
+      url = `${baseUrl}/export?format=${type}`;
+    }
+    
+    fetch(url, {
+      method: 'GET',
+      headers: {
+        'Authorization': `Bearer ${token}`
+      }
+    })
+    .then(response => response.blob())
+    .then(blob => {
+      const url = window.URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = deviceId ? `device_${deviceId}_history.${type}` : `inventory_export.${type}`;
+      document.body.appendChild(a);
+      a.click();    
+      a.remove();
+    })
+    .catch(err => console.error("Export failed:", err));
+  };
+
   const fetchHistory = async (deviceId) => {
     try {
       const history = await DeviceService.getHistory(deviceId, modalTimeframe);
@@ -45,7 +73,6 @@ export default function Dashboard() {
   };
 
   const connectWebSocket = () => {
-    // ... (same as before)
     if (wsRef.current?.readyState === WebSocket.OPEN) {
       return;
     }
@@ -129,7 +156,6 @@ export default function Dashboard() {
   }, [deviceModal, modalTimeframe]);
 
   const activeTriggers = useMemo(() => {
-    // ... (same logic)
     const triggers = [];
     devices.forEach(d => {
       if (d.last_status === "offline") {
@@ -358,11 +384,17 @@ export default function Dashboard() {
           </div>
         </div>
         
-        <select value={timeframe} onChange={e => setTimeframe(e.target.value)} style={{ padding: "10px 16px", borderRadius: "10px", border: "1px solid var(--input-border)", fontWeight: "600" }}>
-          <option value="24h">Real-time Stream</option>
-          <option value="7d">Last 7 Days</option>
-          <option value="30d">Last 30 Days</option>
-        </select>
+        <div style={{ display: "flex", gap: "10px", alignItems: "center" }}>
+          <div className="export-group" style={{ display: "flex", gap: "4px" }}>
+            <button onClick={() => handleExport('csv')} style={{ padding: "8px 12px", fontSize: "0.8rem", backgroundColor: "var(--card-bg)", color: "var(--text-color)", border: "1px solid var(--input-border)" }}>Export CSV</button>
+            <button onClick={() => handleExport('json')} style={{ padding: "8px 12px", fontSize: "0.8rem", backgroundColor: "var(--card-bg)", color: "var(--text-color)", border: "1px solid var(--input-border)" }}>Export JSON</button>
+          </div>
+          <select value={timeframe} onChange={e => setTimeframe(e.target.value)} style={{ padding: "10px 16px", borderRadius: "10px", border: "1px solid var(--input-border)", fontWeight: "600", marginBottom: 0 }}>
+            <option value="24h">Real-time Stream</option>
+            <option value="7d">Last 7 Days</option>
+            <option value="30d">Last 30 Days</option>
+          </select>
+        </div>
       </div>
 
       <div className="dashboard-summary">
@@ -520,12 +552,16 @@ export default function Dashboard() {
                 <select 
                   value={modalTimeframe} 
                   onChange={e => setModalTimeframe(e.target.value)}
-                  style={{ padding: "6px 12px", borderRadius: "8px", border: "1px solid var(--input-border)", fontSize: "0.85rem" }}
+                  style={{ padding: "6px 12px", borderRadius: "8px", border: "1px solid var(--input-border)", fontSize: "0.85rem", marginBottom: 0 }}
                 >
                   <option value="24h">Real-time Stream</option>
                   <option value="7d">7 Days</option>
                   <option value="30d">30 Days</option>
                 </select>
+                <div style={{ display: "flex", gap: "4px" }}>
+                  <button onClick={() => handleExport('csv', deviceModal.id)} style={{ padding: "6px 10px", fontSize: "0.75rem", backgroundColor: "var(--card-bg)", color: "var(--text-color)", border: "1px solid var(--input-border)" }}>CSV</button>
+                  <button onClick={() => handleExport('json', deviceModal.id)} style={{ padding: "6px 10px", fontSize: "0.75rem", backgroundColor: "var(--card-bg)", color: "var(--text-color)", border: "1px solid var(--input-border)" }}>JSON</button>
+                </div>
                 <button className="modal-close" onClick={() => setDeviceModal(null)}>Close</button>
               </div>
             </div>

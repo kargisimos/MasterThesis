@@ -32,6 +32,12 @@
   --danger-muted: #fee2e2;
   --success-text: #065f46;
   --danger-text: #b91c1c;
+
+  --critical: var(--danger);
+  --info: var(--primary);
+  --critical-muted: #fef2f2;
+  --warning-muted: #fffbeb;
+  --info-muted: #eff6ff;
 }
 
 [data-theme='dark'] {
@@ -64,6 +70,10 @@
   --danger-muted: rgba(239, 68, 68, 0.1);
   --success-text: #34d399;
   --danger-text: #f87171;
+
+  --critical-muted: rgba(239, 68, 68, 0.15);
+  --warning-muted: rgba(245, 158, 11, 0.15);
+  --info-muted: rgba(59, 130, 246, 0.15);
 }
 
 body,

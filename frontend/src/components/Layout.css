@@ -358,17 +358,17 @@
 
 .trigger-item.critical {
   border-left-color: var(--critical);
-  background: #fef2f2;
+  background: var(--critical-muted);
 }
 
 .trigger-item.warning {
   border-left-color: var(--warning);
-  background: #fffbeb;
+  background: var(--warning-muted);
 }
 
 .trigger-item.info {
   border-left-color: var(--info);
-  background: #eff6ff;
+  background: var(--info-muted);
 }
 
 .priority-badge {

@@ -13,6 +13,8 @@ from services.encryptor import encrypt_value
 from services.db import get_db
 from services.security import get_current_user
 from api.websocket import manager
+from services.export_service import export_to_csv
+from fastapi.responses import Response, StreamingResponse
 
 router = APIRouter(tags=["Devices"])
 
@@ -165,6 +167,97 @@ def update_device(
     )
 
     return device
+
+
+@router.get("/export")
+def export_devices(
+    format: str = "csv",
+    db: Session = Depends(get_db),
+    current_user=Depends(get_current_user),
+):
+    if current_user.role not in ["admin", "operator", "viewer"]:
+        raise HTTPException(status_code=403, detail="Not authorized")
+
+    devices = db.query(Device).all()
+    
+    export_data = []
+    for d in devices:
+        export_data.append({
+            "id": d.id,
+            "name": d.name,
+            "ip_address": d.ip_address,
+            "type": d.type,
+            "location": d.location,
+            "status": d.last_status,
+            "is_active": d.is_active,
+            "cpu_usage": d.last_cpu,
+            "memory_usage": d.last_memory,
+            "traffic": d.last_traffic,
+            "latency": d.last_latency,
+            "last_polled": d.last_polled.isoformat() if d.last_polled else None,
+            "last_error": d.last_error
+        })
+
+    if format == "json":
+        summary = {
+            "total_devices": len(devices),
+            "active_devices": len([d for d in devices if d.is_active]),
+            "online_devices": len([d for d in devices if d.last_status == "online"]),
+            "timestamp": datetime.utcnow().isoformat()
+        }
+        return {"summary": summary, "devices": export_data}
+
+    headers = ["id", "name", "ip_address", "type", "location", "status", "is_active", "cpu_usage", "memory_usage", "traffic", "latency", "last_polled", "last_error"]
+    csv_content = export_to_csv(export_data, headers)
+    
+    return Response(
+        content=csv_content,
+        media_type="text/csv",
+        headers={"Content-Disposition": "attachment; filename=devices_inventory.csv"}
+    )
+
+
+@router.get("/{device_id}/history/export")
+def export_device_history(
+    device_id: int,
+    format: str = "csv",
+    range: str = "24h",
+    db: Session = Depends(get_db),
+    current_user=Depends(get_current_user),
+):
+    if current_user.role not in ["admin", "operator", "viewer"]:
+        raise HTTPException(status_code=403, detail="Not authorized")
+
+    # Reuse existing history fetching logic or query directly
+    # Here we query directly to avoid schema conflicts in export
+    metrics = (
+        db.query(DeviceMetric)
+        .filter(DeviceMetric.device_id == device_id)
+        .order_by(DeviceMetric.timestamp.desc())
+        .all()
+    )
+
+    export_data = []
+    for m in metrics:
+        export_data.append({
+            "timestamp": m.timestamp.isoformat(),
+            "cpu_usage": m.cpu_usage,
+            "memory_usage": m.memory_usage,
+            "traffic": m.traffic,
+            "latency": m.latency
+        })
+
+    if format == "json":
+        return export_data
+
+    headers = ["timestamp", "cpu_usage", "memory_usage", "traffic", "latency"]
+    csv_content = export_to_csv(export_data, headers)
+    
+    return Response(
+        content=csv_content,
+        media_type="text/csv",
+        headers={"Content-Disposition": f"attachment; filename=device_{device_id}_history.csv"}
+    )
 
 
 @router.delete("/{device_id}", status_code=status.HTTP_204_NO_CONTENT)
