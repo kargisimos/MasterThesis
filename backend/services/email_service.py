@@ -4,16 +4,21 @@ import asyncio
 from email.message import EmailMessage
 from config import settings
 
-def send_email_sync(subject: str, body: str, to_emails: list[str]):
+def send_email_sync(subject: str, content: str, to_emails: list[str], is_html: bool = False):
     if not settings.SMTP_USER or not settings.SMTP_PASSWORD:
         print("SMTP credentials not configured. Skipping email.")
         return
 
     msg = EmailMessage()
-    msg.set_content(body)
     msg["Subject"] = subject
     msg["From"] = settings.EMAIL_FROM
     msg["To"] = ", ".join(to_emails)
+
+    if is_html:
+        msg.set_content("This is an HTML email. Please use an email client that supports HTML.")
+        msg.add_alternative(content, subtype='html')
+    else:
+        msg.set_content(content)
 
     context = ssl.create_default_context()
 
@@ -31,5 +36,5 @@ def send_email_sync(subject: str, body: str, to_emails: list[str]):
         import traceback
         traceback.print_exc()
 
-async def send_email(subject: str, body: str, to_emails: list[str]):
-    await asyncio.to_thread(send_email_sync, subject, body, to_emails)
+async def send_email(subject: str, content: str, to_emails: list[str], is_html: bool = False):
+    await asyncio.to_thread(send_email_sync, subject, content, to_emails, is_html)

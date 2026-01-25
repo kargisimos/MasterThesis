@@ -15,6 +15,16 @@ const AuthService = {
         localStorage.removeItem("access_token");
         localStorage.removeItem("refresh_token");
     },
+
+    forgotPassword: async (email) => {
+        const response = await api.post("/auth/forgot-password", { email });
+        return response.data;
+    },
+
+    resetPassword: async (token, new_password) => {
+        const response = await api.post("/auth/reset-password", { token, new_password });
+        return response.data;
+    },
 };
 
 export default AuthService;

@@ -22,7 +22,7 @@ class UserOut(BaseModel):
     receive_email_notifications: bool
 
     class Config:
-        orm_mode = True
+        from_attributes = True
 
 class UserUpdate(BaseModel):
     full_name: Optional[str] = None
@@ -38,4 +38,11 @@ class Token(BaseModel):
 
 class ChangePasswordRequest(BaseModel):
     current_password: str
+    new_password: str
+
+class ForgotPasswordRequest(BaseModel):
+    email: EmailStr
+
+class ResetPasswordRequest(BaseModel):
+    token: str
     new_password: str

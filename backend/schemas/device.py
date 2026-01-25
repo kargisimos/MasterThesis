@@ -41,7 +41,7 @@ class DeviceOut(DeviceBase):
     configured_credentials: list[str] = []
 
     class Config:
-        orm_mode = True
+        from_attributes = True
 
 class MetricOut(BaseModel):
     id: int
@@ -53,7 +53,7 @@ class MetricOut(BaseModel):
     latency: Optional[float] = None
 
     class Config:
-        orm_mode = True
+        from_attributes = True
 class TrendOut(BaseModel):
     timestamp: datetime
     avg_cpu: float
@@ -75,4 +75,4 @@ class CredentialOut(CredentialBase):
     device_id: int
 
     class Config:
-        orm_mode = True
+        from_attributes = True

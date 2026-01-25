@@ -3,8 +3,15 @@ from sqlalchemy.orm import Session
 from datetime import datetime, timedelta
 from jose import JWTError, jwt
 
-from models.user import User
-from schemas.user import UserLogin, UserCreate, Token, ChangePasswordRequest
+from models.user import User, PasswordResetToken
+from schemas.user import (
+    UserLogin, 
+    UserCreate, 
+    Token, 
+    ChangePasswordRequest, 
+    ForgotPasswordRequest, 
+    ResetPasswordRequest
+)
 from config import settings
 from services.auditlogger import log_action
 from services.db import get_db
@@ -15,6 +22,8 @@ from services.security import (
     create_refresh_token,
     oauth2_scheme,
 )
+from services.email_service import send_email
+import secrets
 
 router = APIRouter(
     tags=["Auth"]
@@ -181,6 +190,82 @@ def change_password(
         actor_email=current_user_email,
         target_type="user",
         target_name=current_user_email
+    )
+
+@router.post("/forgot-password", status_code=status.HTTP_200_OK)
+async def forgot_password(
+    payload: ForgotPasswordRequest,
+    db: Session = Depends(get_db)
+):
+    user = db.query(User).filter(User.email == payload.email).first()
+    
+    if not user:
+        return {"message": "If an account exists for this email, a reset link has been sent."}
+
+    token = secrets.token_urlsafe(32)
+    expires_at = datetime.utcnow() + timedelta(minutes=30)
+    
+    reset_token = PasswordResetToken(
+        user_id=user.id,
+        token=token,
+        expires_at=expires_at
+    )
+    db.add(reset_token)
+    db.commit()
+
+    reset_link = f"http://localhost:5173/reset-password?token={token}"
+    email_content = f"""
+    <html>
+        <body>
+            <h3>Password Reset Request</h3>
+            <p>Hello {user.full_name},</p>
+            <p>We received a request to reset your password. Click the link below to set a new one:</p>
+            <p><a href="{reset_link}">{reset_link}</a></p>
+            <p>This link will expire in 30 minutes.</p>
+            <p>If you didn't request this, you can safely ignore this email.</p>
+        </body>
+    </html>
+    """
+    
+    try:
+        await send_email(
+            subject="Password Reset - Network Monitoring System",
+            content=email_content,
+            to_emails=[user.email],
+            is_html=True
+        )
+    except Exception as e:
+        print(f"Failed to send reset email: {e}")
+
+    return {"message": "If an account exists for this email, a reset link has been sent."}
+
+
+@router.post("/reset-password", status_code=status.HTTP_204_NO_CONTENT)
+def reset_password(
+    payload: ResetPasswordRequest,
+    db: Session = Depends(get_db)
+):
+    reset_token = db.query(PasswordResetToken).filter(PasswordResetToken.token == payload.token).first()
+    
+    if not reset_token or reset_token.expires_at < datetime.utcnow():
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Invalid or expired reset token"
+        )
+
+    user = reset_token.user
+    user.hashed_password = get_password_hash(payload.new_password)
+    
+    # Delete the token after use
+    db.delete(reset_token)
+    db.commit()
+
+    log_action(
+        db=db,
+        action="password_reset_success",
+        actor_email=user.email,
+        target_type="user",
+        target_name=user.email
     )
 
     return
