@@ -473,4 +473,96 @@ def get_device_history(
         for r in results
     ]
 
+# --- Active Device Management ---
+
+from services.ssh_manager import get_running_services, restart_service, reboot_device
+from services.encryptor import decrypt_value
+
+def _get_ssh_credentials(db: Session, device_id: int):
+    device = db.query(Device).filter(Device.id == device_id).first()
+    if not device:
+        raise HTTPException(status_code=404, detail="Device not found")
+        
+    ssh_cred = next((c for c in device.credentials if c.type == "ssh"), None)
+    if not ssh_cred or not ssh_cred.username or not ssh_cred.password:
+        raise HTTPException(status_code=400, detail="Device does not have SSH credentials configured")
+        
+    u = decrypt_value(ssh_cred.username)
+    p = decrypt_value(ssh_cred.password)
+    if not u or not p:
+        raise HTTPException(status_code=400, detail="Invalid SSH credentials")
+        
+    return device, u, p
+
+@router.get("/{device_id}/services")
+async def list_device_services(
+    device_id: int,
+    db: Session = Depends(get_db),
+    current_user=Depends(get_current_user),
+):
+    if current_user.role not in ["admin", "operator"]:
+        raise HTTPException(status_code=403, detail="Not authorized")
+        
+    device, username, password = _get_ssh_credentials(db, device_id)
+    
+    try:
+        services = await get_running_services(device.ip_address, username, password)
+        return services
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+@router.post("/{device_id}/services/{service_name}/restart")
+async def process_restart_service(
+    device_id: int,
+    service_name: str,
+    db: Session = Depends(get_db),
+    current_user=Depends(get_current_user),
+):
+    if current_user.role not in ["admin", "operator"]:
+        raise HTTPException(status_code=403, detail="Not authorized")
+        
+    device, username, password = _get_ssh_credentials(db, device_id)
+    
+    try:
+        await restart_service(device.ip_address, username, password, service_name)
+        log_action(
+            db=db,
+            action="service_restarted",
+            actor_email=current_user.email,
+            target_type="device",
+            target_name=device.name,
+            # 'details' is not supported by the current log_action implementation
+        )
+        return {"status": "success", "message": f"Service {service_name} restarted"}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+@router.post("/{device_id}/reboot")
+async def process_reboot_device(
+    device_id: int,
+    db: Session = Depends(get_db),
+    current_user=Depends(get_current_user),
+):
+    if current_user.role not in ["admin", "operator"]:
+        raise HTTPException(status_code=403, detail="Not authorized")
+        
+    device, username, password = _get_ssh_credentials(db, device_id)
+    
+    try:
+        await reboot_device(device.ip_address, username, password)
+        log_action(
+            db=db,
+            action="device_rebooted",
+            actor_email=current_user.email,
+            target_type="device",
+            target_name=device.name
+        )
+        return {"status": "success", "message": "Reboot initiated"}
+    except Exception as e:
+        # A timeout exception is expected when rebooting due to dropped connection,
+        # so ssh_manager.reboot_device returns True instead of raising.
+        # So if we reach here, it's a real failure.
+        raise HTTPException(status_code=500, detail=str(e))
+
+
 

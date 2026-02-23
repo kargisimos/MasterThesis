@@ -17,6 +17,14 @@ export default function Dashboard() {
   const [isLoading, setIsLoading] = useState(true);
   const [wsConnected, setWsConnected] = useState(false);
   const [lastUpdate, setLastUpdate] = useState(null);
+  
+  // New State for Management View
+  const [showManageView, setShowManageView] = useState(false);
+  const [services, setServices] = useState([]);
+  const [servicesLoading, setServicesLoading] = useState(false);
+  const [managingAction, setManagingAction] = useState(null); // 'reboot', or service name
+  const [confirmModal, setConfirmModal] = useState(null);
+  
   const wsRef = React.useRef(null);
   const reconnectTimeoutRef = React.useRef(null);
 
@@ -147,13 +155,72 @@ export default function Dashboard() {
 
   useEffect(() => {
     if (deviceModal) {
-      fetchHistory(deviceModal.id);
-      const interval = setInterval(() => fetchHistory(deviceModal.id), 30000);
-      return () => clearInterval(interval);
+      if (!showManageView) {
+        fetchHistory(deviceModal.id);
+        const interval = setInterval(() => fetchHistory(deviceModal.id), 30000);
+        return () => clearInterval(interval);
+      } else {
+        fetchServices(deviceModal.id);
+      }
     } else {
       setDeviceHistory([]);
+      setShowManageView(false);
     }
-  }, [deviceModal, modalTimeframe]);
+  }, [deviceModal, modalTimeframe, showManageView]);
+
+  const fetchServices = async (id) => {
+    setServicesLoading(true);
+    try {
+      const data = await DeviceService.getServices(id);
+      setServices(data || []);
+    } catch (e) {
+      console.error("Failed to fetch services", e);
+      alert("Failed to fetch running services. Ensure SSH is configured and active.");
+      setServices([]);
+    } finally {
+      setServicesLoading(false);
+    }
+  };
+
+  const handleRestartService = (serviceName) => {
+    setConfirmModal({
+      title: 'Restart Service',
+      message: `Are you sure you want to restart ${serviceName}?`,
+      type: 'warning',
+      onConfirm: async () => {
+        setConfirmModal(null);
+        setManagingAction(serviceName);
+        try {
+          await DeviceService.restartService(deviceModal.id, serviceName);
+          fetchServices(deviceModal.id);
+        } catch (e) {
+          alert(`Failed to restart ${serviceName}: ` + (e.response?.data?.detail || e.message));
+        } finally {
+          setManagingAction(null);
+        }
+      }
+    });
+  };
+
+  const handleReboot = () => {
+    setConfirmModal({
+      title: 'Reboot Device',
+      message: `CRITICAL ACTION: Are you sure you want to REBOOT ${deviceModal.name}? This will cause immediate downtime.`,
+      type: 'danger',
+      onConfirm: async () => {
+        setConfirmModal(null);
+        setManagingAction('reboot');
+        try {
+          await DeviceService.rebootDevice(deviceModal.id);
+          setDeviceModal(null); // Close modal 
+        } catch (e) {
+          alert(`Failed to send reboot command: ` + (e.response?.data?.detail || e.message));
+        } finally {
+          setManagingAction(null);
+        }
+      }
+    });
+  };
 
   const activeTriggers = useMemo(() => {
     const triggers = [];
@@ -542,86 +609,228 @@ export default function Dashboard() {
 
       {deviceModal && (
         <div className="modal-overlay" onClick={() => setDeviceModal(null)}>
-          <div className="modal" onClick={e => e.stopPropagation()}>
+          <div className="modal" style={{ maxWidth: '900px', width: '90vw' }} onClick={e => e.stopPropagation()}>
             <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: "24px" }}>
               <div>
-                <h2 style={{ margin: 0 }}>{deviceModal.name} Diagnostic Detail</h2>
+                <h2 style={{ margin: 0 }}>{deviceModal.name} {showManageView ? "Management" : "Diagnostic Detail"}</h2>
                 <div style={{ color: "var(--text-muted)", fontSize: "0.9rem" }}>IP: {deviceModal.ip_address} | Type: {deviceModal.type.toUpperCase()}</div>
               </div>
-              <div style={{ display: 'flex', gap: '8px' }}>
-                <select 
-                  value={modalTimeframe} 
-                  onChange={e => setModalTimeframe(e.target.value)}
-                  style={{ padding: "6px 12px", borderRadius: "8px", border: "1px solid var(--input-border)", fontSize: "0.85rem", marginBottom: 0 }}
+              <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+                <button 
+                  onClick={() => setShowManageView(!showManageView)}
+                  style={{ 
+                    padding: "6px 16px", 
+                    borderRadius: "8px", 
+                    backgroundColor: showManageView ? "var(--accent)" : "transparent",
+                    color: showManageView ? "#fff" : "var(--accent)", 
+                    border: "1px solid var(--accent)",
+                    fontWeight: "600",
+                    transition: "all 0.2s"
+                  }}
                 >
-                  <option value="24h">Real-time Stream</option>
-                  <option value="7d">7 Days</option>
-                  <option value="30d">30 Days</option>
-                </select>
-                <div style={{ display: "flex", gap: "4px" }}>
-                  <button onClick={() => handleExport('csv', deviceModal.id)} style={{ padding: "6px 10px", fontSize: "0.75rem", backgroundColor: "var(--card-bg)", color: "var(--text-color)", border: "1px solid var(--input-border)" }}>CSV</button>
-                  <button onClick={() => handleExport('json', deviceModal.id)} style={{ padding: "6px 10px", fontSize: "0.75rem", backgroundColor: "var(--card-bg)", color: "var(--text-color)", border: "1px solid var(--input-border)" }}>JSON</button>
-                </div>
+                  {showManageView ? "View Diagnostics" : "⚙️ Manage Device"}
+                </button>
+                
+                {!showManageView && (
+                  <>
+                    <div style={{ display: "flex", border: "1px solid var(--input-border)", borderRadius: "8px", overflow: "hidden" }}>
+                      {[
+                        { value: "24h", label: "Real-time" },
+                        { value: "7d", label: "7 Days" },
+                        { value: "30d", label: "30 Days" }
+                      ].map(option => (
+                        <button
+                          key={option.value}
+                          onClick={() => setModalTimeframe(option.value)}
+                          style={{
+                            padding: "6px 12px",
+                            fontSize: "0.85rem",
+                            backgroundColor: modalTimeframe === option.value ? "var(--primary)" : "transparent",
+                            color: modalTimeframe === option.value ? "#fff" : "var(--text-color)",
+                            border: "none",
+                            borderRight: option.value !== "30d" ? "1px solid var(--input-border)" : "none",
+                            borderRadius: 0,
+                            margin: 0,
+                            fontWeight: modalTimeframe === option.value ? "600" : "400"
+                          }}
+                        >
+                          {option.label}
+                        </button>
+                      ))}
+                    </div>
+                    <div style={{ display: "flex", gap: "4px" }}>
+                      <button onClick={() => handleExport('csv', deviceModal.id)} style={{ padding: "6px 10px", fontSize: "0.75rem", backgroundColor: "var(--card-bg)", color: "var(--text-color)", border: "1px solid var(--input-border)" }}>CSV</button>
+                      <button onClick={() => handleExport('json', deviceModal.id)} style={{ padding: "6px 10px", fontSize: "0.75rem", backgroundColor: "var(--card-bg)", color: "var(--text-color)", border: "1px solid var(--input-border)" }}>JSON</button>
+                    </div>
+                  </>
+                )}
                 <button className="modal-close" onClick={() => setDeviceModal(null)}>Close</button>
               </div>
             </div>
             
-            <div className="modal-grid">
-              <div className="modal-info">
-                <h3>Vitals (Current)</h3>
-                <p>Status: <b style={{ color: deviceModal.last_status === "online" ? "var(--success)" : "var(--danger)" }}>{deviceModal.last_status.toUpperCase()}</b></p>
-                {deviceModal.last_error && (
-                  <p>Last Error: <b style={{ color: "var(--danger)" }}>{deviceModal.last_error}</b></p>
-                )}
-                <p>CPU Load: <b style={{ color: getMetricColor("cpu", deviceModal.last_cpu) }}>{deviceModal.last_cpu || 0}%</b></p>
-                <p>Memory Usage: <b style={{ color: getMetricColor("mem", deviceModal.last_memory) }}>{deviceModal.last_memory || 0}%</b></p>
-                <p>Response Latency: <b style={{ color: getMetricColor("lat", deviceModal.last_latency) }}>{deviceModal.last_latency || "--"} ms</b></p>
-              </div>
-              <div className="modal-info">
-                <h3>Detailed Meta</h3>
-                <p>Location: <b>{deviceModal.location || "Not set"}</b></p>
-                <p>Last Polled: <b>{deviceModal.last_polled ? new Date(deviceModal.last_polled).toLocaleTimeString() : "Never"}</b></p>
-                <div style={{ marginTop: "12px", paddingTop: "12px", borderTop: "1px solid var(--card-border)" }}>
-                  <div style={{ fontSize: "0.85rem", fontWeight: "600", marginBottom: "6px" }}>Poll Protocols:</div>
-                  <div style={{ display: "flex", gap: "8px" }}>
-                    <ProtocolBadge 
-                      type="SSH" 
-                      configured={deviceModal.configured_credentials?.includes("ssh")} 
-                      failed={JSON.parse(deviceModal.failing_protocols || "[]").includes("ssh")} 
-                    />
-                    <ProtocolBadge 
-                      type="SNMP" 
-                      configured={deviceModal.configured_credentials?.includes("snmp")} 
-                      failed={JSON.parse(deviceModal.failing_protocols || "[]").includes("snmp")} 
-                    />
-                  </div>
+            {showManageView ? (
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
+                <div className="dashboard-chart-card" style={{ padding: '24px' }}>
+                     <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' }}>
+                        <h3 style={{ margin: 0 }}>Running Services (systemd)</h3>
+                        <button 
+                            onClick={() => fetchServices(deviceModal.id)} 
+                            disabled={servicesLoading}
+                            style={{ padding: '6px 12px', fontSize: '0.85rem' }}
+                        >
+                            {servicesLoading ? 'Loading...' : 'Refresh List'}
+                        </button>
+                     </div>
+                     
+                     <div style={{ maxHeight: '400px', overflowY: 'auto', border: '1px solid var(--input-border)', borderRadius: '8px' }}>
+                         <table className="data-table" style={{ margin: 0 }}>
+                            <thead style={{ position: 'sticky', top: 0, backgroundColor: 'var(--card-bg)', zIndex: 1 }}>
+                                <tr>
+                                    <th>Service Name</th>
+                                    <th>Status</th>
+                                    <th>Description</th>
+                                    <th style={{ textAlign: 'right' }}>Actions</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {services.length === 0 && !servicesLoading && (
+                                    <tr>
+                                        <td colSpan="4" style={{ textAlign: 'center', padding: '20px', color: 'var(--text-muted)' }}>
+                                            No services found or SSH is not configured.
+                                        </td>
+                                    </tr>
+                                )}
+                                {services.map((svc) => (
+                                    <tr key={svc.name}>
+                                        <td style={{ fontWeight: '500' }}>{svc.name}</td>
+                                        <td>
+                                            <span style={{ color: '#10b981', fontSize: '0.8rem', fontWeight: 'bold' }}>● {svc.status}</span>
+                                        </td>
+                                        <td style={{ color: 'var(--text-muted)', fontSize: '0.85rem' }}>{svc.description}</td>
+                                        <td style={{ textAlign: 'right' }}>
+                                            <button 
+                                                onClick={() => handleRestartService(svc.name)}
+                                                disabled={managingAction === svc.name}
+                                                style={{ 
+                                                    padding: '4px 10px', 
+                                                    fontSize: '0.8rem', 
+                                                    backgroundColor: 'transparent', 
+                                                    border: '1px solid var(--input-border)',
+                                                    color: 'var(--text-color)'
+                                                }}
+                                            >
+                                                {managingAction === svc.name ? 'Restarting...' : 'Restart'}
+                                            </button>
+                                        </td>
+                                    </tr>
+                                ))}
+                            </tbody>
+                         </table>
+                     </div>
                 </div>
-              </div>
-            </div>
 
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
-              <div className="dashboard-chart-card">
-                <h3 style={{ fontSize: '1.1rem', marginBottom: '16px' }}>CPU Load History (%)</h3>
-                <div className="chart-container" style={{ height: "220px" }}>
-                  <Line data={getChartData("CPU (%)", "cpu_usage", deviceHistory, "#3b82f6", "rgba(59,130,246,0.1)", modalTimeframe)} options={resourceLoadOptions} />
+                <div className="dashboard-chart-card" style={{ padding: '24px', borderLeft: '4px solid var(--danger)' }}>
+                    <h3 style={{ color: 'var(--danger)', marginBottom: '8px', margin: 0 }}>Danger Zone</h3>
+                    <p style={{ color: 'var(--text-muted)', fontSize: '0.9rem', marginBottom: '16px' }}>
+                        These actions may cause immediate downtime for the selected device and any connected clients.
+                    </p>
+                    <button 
+                        onClick={handleReboot}
+                        disabled={managingAction === 'reboot'}
+                        style={{ 
+                            backgroundColor: 'var(--danger)', 
+                            color: 'white', 
+                            padding: '10px 20px', 
+                            border: 'none', 
+                            borderRadius: '6px',
+                            fontWeight: 'bold',
+                            cursor: managingAction === 'reboot' ? 'not-allowed' : 'pointer',
+                            opacity: managingAction === 'reboot' ? 0.7 : 1
+                        }}
+                    >
+                        {managingAction === 'reboot' ? 'Sending command...' : '⚠️ Reboot Device'}
+                    </button>
                 </div>
               </div>
-              <div className="dashboard-chart-card">
-                <h3 style={{ fontSize: '1.1rem', marginBottom: '16px' }}>Memory Usage History (%)</h3>
-                <div className="chart-container" style={{ height: "220px" }}>
-                  <Line data={getChartData("Memory (%)", "memory_usage", deviceHistory, "#f59e0b", "rgba(245,158,11,0.1)", modalTimeframe)} options={resourceLoadOptions} />
-                </div>
-              </div>
-              <div className="dashboard-chart-card">
-                <h3 style={{ fontSize: '1.1rem', marginBottom: '16px' }}>Network Throughput</h3>
-                <div className="chart-container" style={{ height: "220px" }}>
-                  <Line data={getChartData("Traffic (MB/s)", "traffic", deviceHistory, "#10b981", "rgba(16,185,129,0.1)", modalTimeframe)} options={throughputChartOptions} />
-                </div>
-              </div>
+            ) : (
+                <>
+                    <div className="modal-grid">
+                      <div className="modal-info">
+                        <h3>Vitals (Current)</h3>
+                        <p>Status: <b style={{ color: deviceModal.last_status === "online" ? "var(--success)" : "var(--danger)" }}>{deviceModal.last_status.toUpperCase()}</b></p>
+                        {deviceModal.last_error && (
+                          <p>Last Error: <b style={{ color: "var(--danger)" }}>{deviceModal.last_error}</b></p>
+                        )}
+                        <p>CPU Load: <b style={{ color: getMetricColor("cpu", deviceModal.last_cpu) }}>{deviceModal.last_cpu || 0}%</b></p>
+                        <p>Memory Usage: <b style={{ color: getMetricColor("mem", deviceModal.last_memory) }}>{deviceModal.last_memory || 0}%</b></p>
+                        <p>Response Latency: <b style={{ color: getMetricColor("lat", deviceModal.last_latency) }}>{deviceModal.last_latency || "--"} ms</b></p>
+                      </div>
+                      <div className="modal-info">
+                        <h3>Detailed Meta</h3>
+                        <p>Location: <b>{deviceModal.location || "Not set"}</b></p>
+                        <p>Last Polled: <b>{deviceModal.last_polled ? new Date(deviceModal.last_polled).toLocaleTimeString() : "Never"}</b></p>
+                        <div style={{ marginTop: "12px", paddingTop: "12px", borderTop: "1px solid var(--card-border)" }}>
+                          <div style={{ fontSize: "0.85rem", fontWeight: "600", marginBottom: "6px" }}>Poll Protocols:</div>
+                          <div style={{ display: "flex", gap: "8px" }}>
+                            <ProtocolBadge 
+                              type="SSH" 
+                              configured={deviceModal.configured_credentials?.includes("ssh")} 
+                              failed={JSON.parse(deviceModal.failing_protocols || "[]").includes("ssh")} 
+                            />
+                            <ProtocolBadge 
+                              type="SNMP" 
+                              configured={deviceModal.configured_credentials?.includes("snmp")} 
+                              failed={JSON.parse(deviceModal.failing_protocols || "[]").includes("snmp")} 
+                            />
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
+                      <div className="dashboard-chart-card">
+                        <h3 style={{ fontSize: '1.1rem', marginBottom: '16px' }}>CPU Load History (%)</h3>
+                        <div className="chart-container" style={{ height: "220px" }}>
+                          <Line data={getChartData("CPU (%)", "cpu_usage", deviceHistory, "#3b82f6", "rgba(59,130,246,0.1)", modalTimeframe)} options={resourceLoadOptions} />
+                        </div>
+                      </div>
+                      <div className="dashboard-chart-card">
+                        <h3 style={{ fontSize: '1.1rem', marginBottom: '16px' }}>Memory Usage History (%)</h3>
+                        <div className="chart-container" style={{ height: "220px" }}>
+                          <Line data={getChartData("Memory (%)", "memory_usage", deviceHistory, "#f59e0b", "rgba(245,158,11,0.1)", modalTimeframe)} options={resourceLoadOptions} />
+                        </div>
+                      </div>
+                      <div className="dashboard-chart-card">
+                        <h3 style={{ fontSize: '1.1rem', marginBottom: '16px' }}>Network Throughput</h3>
+                        <div className="chart-container" style={{ height: "220px" }}>
+                          <Line data={getChartData("Traffic (MB/s)", "traffic", deviceHistory, "#10b981", "rgba(16,185,129,0.1)", modalTimeframe)} options={throughputChartOptions} />
+                        </div>
+                      </div>
+                    </div>
+                </>
+            )}
+          </div>
+        </div>
+      )}
+      {/* Confirm Modal Overlay */}
+      {confirmModal && (
+        <div className="modal-overlay" style={{ zIndex: 2000 }} onClick={() => setConfirmModal(null)}>
+          <div className="modal" onClick={(e) => e.stopPropagation()}>
+            <h2>{confirmModal.title}</h2>
+            <p style={{ marginBottom: "20px" }}>{confirmModal.message}</p>
+            <div style={{ display: "flex", gap: "10px" }}>
+              <button 
+                className={confirmModal.type === "danger" ? "danger" : ""} 
+                onClick={confirmModal.onConfirm}
+              >
+                Confirm
+              </button>
+              <button type="button" onClick={() => setConfirmModal(null)}>Cancel</button>
             </div>
           </div>
         </div>
       )}
+
     </div>
   );
 }

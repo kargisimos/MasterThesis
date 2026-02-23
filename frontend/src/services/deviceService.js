@@ -34,6 +34,21 @@ const DeviceService = {
         const response = await api.get(`/devices/stats/trends?range=${timeframe}`);
         return response.data;
     },
+
+    getServices: async (id) => {
+        const response = await api.get(`/devices/${id}/services`);
+        return response.data;
+    },
+
+    restartService: async (id, serviceName) => {
+        const response = await api.post(`/devices/${id}/services/${serviceName}/restart`);
+        return response.data;
+    },
+
+    rebootDevice: async (id) => {
+        const response = await api.post(`/devices/${id}/reboot`);
+        return response.data;
+    },
 };
 
 export default DeviceService;
