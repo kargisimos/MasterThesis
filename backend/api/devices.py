@@ -300,6 +300,7 @@ async def import_devices(
                 name=name,
                 ip_address=ip_address,
                 type=device_type,
+                model=row.get("model") if row.get("model") else None,
                 location=location,
                 notes=notes,
                 is_active=is_active,
