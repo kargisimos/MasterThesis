@@ -22,6 +22,7 @@ export default function Dashboard() {
   const [showManageView, setShowManageView] = useState(false);
   const [services, setServices] = useState([]);
   const [servicesLoading, setServicesLoading] = useState(false);
+  const [servicesError, setServicesError] = useState(null);
   const [managingAction, setManagingAction] = useState(null); // 'reboot', or service name
   const [confirmModal, setConfirmModal] = useState(null);
   
@@ -170,12 +171,14 @@ export default function Dashboard() {
 
   const fetchServices = async (id) => {
     setServicesLoading(true);
+    setServicesError(null);
     try {
       const data = await DeviceService.getServices(id);
       setServices(data || []);
     } catch (e) {
       console.error("Failed to fetch services", e);
-      alert("Failed to fetch running services. Ensure SSH is configured and active.");
+      const detail = e.response?.data?.detail || "Failed to fetch running services. Ensure SSH is configured and active.";
+      setServicesError(detail);
       setServices([]);
     } finally {
       setServicesLoading(false);
@@ -695,8 +698,11 @@ export default function Dashboard() {
                             <tbody>
                                 {services.length === 0 && !servicesLoading && (
                                     <tr>
-                                        <td colSpan="4" style={{ textAlign: 'center', padding: '20px', color: 'var(--text-muted)' }}>
-                                            No services found or SSH is not configured.
+                                        <td colSpan="4" style={{ textAlign: 'center', padding: '20px', color: servicesError ? 'var(--danger, #ef4444)' : 'var(--text-muted)' }}>
+                                            {servicesError
+                                              ? `⚠ ${servicesError}`
+                                              : "No services found or SSH is not configured."
+                                            }
                                         </td>
                                     </tr>
                                 )}

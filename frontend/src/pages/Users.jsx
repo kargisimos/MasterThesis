@@ -13,6 +13,7 @@ export default function Users() {
   const [search, setSearch] = useState("");
   const [page, setPage] = useState(1);
   const [showAddModal, setShowAddModal] = useState(false);
+  const [confirmModal, setConfirmModal] = useState(null);
   const [newUser, setNewUser] = useState({
     email: "",
     full_name: "",
@@ -78,20 +79,26 @@ export default function Users() {
     }
   };
 
-  const deleteUser = async (user) => {
+  const deleteUser = (user) => {
     if (user.email === currentUserEmail) {
       alert("You cannot delete your own account.");
       return;
     }
-    if (!window.confirm(`Delete user "${user.email}"?`)) return;
-
-    try {
-      await api.delete(`/users/${user.id}`);
-      setUsers(users.filter((u) => u.id !== user.id));
-      showSuccess("User deleted.");
-    } catch {
-      alert("Failed to delete user.");
-    }
+    setConfirmModal({
+      title: "Delete User",
+      message: `Are you sure you want to delete "${user.email}"? This action cannot be undone.`,
+      type: "danger",
+      onConfirm: async () => {
+        setConfirmModal(null);
+        try {
+          await api.delete(`/users/${user.id}`);
+          setUsers(users.filter((u) => u.id !== user.id));
+          showSuccess("User deleted.");
+        } catch {
+          alert("Failed to delete user.");
+        }
+      },
+    });
   };
 
   const filteredUsers = users.filter(
@@ -306,6 +313,24 @@ export default function Users() {
                 Cancel
               </button>
             </form>
+          </div>
+        </div>
+      )}
+
+      {confirmModal && (
+        <div className="modal-overlay" onClick={() => setConfirmModal(null)}>
+          <div className="modal" onClick={(e) => e.stopPropagation()}>
+            <h2>{confirmModal.title}</h2>
+            <p style={{ marginBottom: "20px" }}>{confirmModal.message}</p>
+            <div style={{ display: "flex", gap: "10px" }}>
+              <button
+                className={confirmModal.type === "danger" ? "danger" : ""}
+                onClick={confirmModal.onConfirm}
+              >
+                Confirm
+              </button>
+              <button type="button" onClick={() => setConfirmModal(null)}>Cancel</button>
+            </div>
           </div>
         </div>
       )}

@@ -14,6 +14,10 @@ export default function Devices() {
   const [search, setSearch] = useState("");
   const [page, setPage] = useState(1);
   const [showAddModal, setShowAddModal] = useState(false);
+  const [confirmModal, setConfirmModal] = useState(null);
+  const [importResults, setImportResults] = useState(null);
+  const [importLoading, setImportLoading] = useState(false);
+  const importInputRef = React.useRef(null);
   
   const [newDevice, setNewDevice] = useState({
     name: "",
@@ -52,6 +56,24 @@ export default function Devices() {
     }
   };
 
+  const handleImportCSV = async (e) => {
+    const file = e.target.files[0];
+    if (!file) return;
+    setImportLoading(true);
+    try {
+      const result = await DeviceService.importDevices(file);
+      setImportResults(result);
+      if (result.imported > 0) fetchDevices();
+    } catch (err) {
+      const detail = err?.response?.data?.detail || "Import failed";
+      alert(detail);
+    } finally {
+      setImportLoading(false);
+      // reset input so the same file can be re-uploaded if needed
+      if (importInputRef.current) importInputRef.current.value = "";
+    }
+  };
+
   const createDevice = async (e) => {
     e.preventDefault();
     try {
@@ -76,15 +98,22 @@ export default function Devices() {
     }
   };
 
-  const deleteDevice = async (device) => {
-    if (!window.confirm(`Delete device "${device.name}"?`)) return;
-    try {
-      await DeviceService.delete(device.id);
-      setDevices(devices.filter((d) => d.id !== device.id));
-      showSuccess("Device deleted.");
-    } catch {
-      alert("Failed to delete device.");
-    }
+  const deleteDevice = (device) => {
+    setConfirmModal({
+      title: "Delete Device",
+      message: `Are you sure you want to delete "${device.name}"? This action cannot be undone.`,
+      type: "danger",
+      onConfirm: async () => {
+        setConfirmModal(null);
+        try {
+          await DeviceService.delete(device.id);
+          setDevices(devices.filter((d) => d.id !== device.id));
+          showSuccess("Device deleted.");
+        } catch {
+          alert("Failed to delete device.");
+        }
+      },
+    });
   };
 
   const openCredentialsModal = (device) => {
@@ -141,9 +170,25 @@ export default function Devices() {
         </div>
       )}
 
-      <button className="add-device-btn" onClick={() => setShowAddModal(true)}>
-        Add Device
-      </button>
+      <div style={{ display: "flex", gap: "10px", alignItems: "center" }}>
+        <button className="add-device-btn" onClick={() => setShowAddModal(true)}>
+          Add Device
+        </button>
+        <button
+          className="add-device-btn"
+          onClick={() => importInputRef.current?.click()}
+          disabled={importLoading}
+        >
+          {importLoading ? "Importing…" : "⬆ Import CSV"}
+        </button>
+        <input
+          ref={importInputRef}
+          type="file"
+          accept=".csv"
+          style={{ display: "none" }}
+          onChange={handleImportCSV}
+        />
+      </div>
 
       <input
         placeholder="Search devices..."
@@ -288,6 +333,76 @@ export default function Devices() {
 
             <button onClick={saveCredentials}>Save</button>
             <button onClick={() => setCredentialsDevice(null)}>Cancel</button>
+          </div>
+        </div>
+      )}
+
+      {importResults && (
+        <div className="modal-overlay" onClick={() => setImportResults(null)}>
+          <div className="modal" onClick={(e) => e.stopPropagation()} style={{ maxWidth: "680px", width: "90%" }}>
+            <h2>Import Results</h2>
+            <p style={{ marginBottom: "12px", color: "var(--text-secondary, #666)" }}>
+              <strong style={{ color: "var(--success, #22c55e)" }}>{importResults.imported} imported</strong>
+              {" · "}
+              <strong style={{ color: importResults.failed > 0 ? "var(--danger, #ef4444)" : "inherit" }}>
+                {importResults.failed} failed
+              </strong>
+              {" · "}{importResults.total} total rows
+            </p>
+            <div style={{ maxHeight: "380px", overflowY: "auto" }}>
+              <table className="data-table" style={{ fontSize: "0.85rem" }}>
+                <thead>
+                  <tr>
+                    <th>Row</th>
+                    <th>Name</th>
+                    <th>Status</th>
+                    <th>Details</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {importResults.results.map((r) => (
+                    <tr key={r.row}>
+                      <td>{r.row}</td>
+                      <td>{r.name || "—"}</td>
+                      <td>
+                        <span style={{
+                          padding: "2px 8px",
+                          borderRadius: "10px",
+                          fontSize: "0.75rem",
+                          fontWeight: 600,
+                          backgroundColor: r.status === "imported" ? "#d1fae5" : "#fee2e2",
+                          color: r.status === "imported" ? "#065f46" : "#991b1b",
+                        }}>
+                          {r.status === "imported" ? "✓ Imported" : "✗ Failed"}
+                        </span>
+                      </td>
+                      <td style={{ color: "var(--text-secondary, #666)" }}>
+                        {r.status === "imported" ? `ID: ${r.id}` : r.reason}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+            <button style={{ marginTop: "16px" }} onClick={() => setImportResults(null)}>Close</button>
+          </div>
+        </div>
+      )}
+
+      {confirmModal && (
+        <div className="modal-overlay" onClick={() => setConfirmModal(null)}>
+          <div className="modal" onClick={(e) => e.stopPropagation()}>
+            <h2>{confirmModal.title}</h2>
+            <p style={{ marginBottom: "20px" }}>{confirmModal.message}</p>
+            <div style={{ display: "flex", gap: "10px" }}>
+              <button
+                className={confirmModal.type === "danger" ? "danger" : ""}
+                onClick={confirmModal.onConfirm}
+              >
+                Confirm
+              </button>
+              <button type="button" onClick={() => setConfirmModal(null)}>Cancel</button>
+            </div>
           </div>
         </div>
       )}

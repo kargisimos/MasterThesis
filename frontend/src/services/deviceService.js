@@ -49,6 +49,15 @@ const DeviceService = {
         const response = await api.post(`/devices/${id}/reboot`);
         return response.data;
     },
+
+    importDevices: async (csvFile) => {
+        const formData = new FormData();
+        formData.append("file", csvFile);
+        const response = await api.post("/devices/import", formData, {
+            headers: { "Content-Type": "multipart/form-data" },
+        });
+        return response.data;
+    },
 };
 
 export default DeviceService;

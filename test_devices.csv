@@ -1,0 +1,8 @@
+name,ip_address,type,location,notes
+New Router 1,10.0.0.1,Router,Datacenter A,Core router
+New Switch 1,10.0.0.2,Switch,,Edge switch
+New Server 1,10.0.0.3,Server,Datacenter B,
+Invalid Device,10.0.0.4,Fridge,Kitchen,Will fail validation due to type
+Missing IP,,Server,Nowhere,Will fail due to missing IP
+Duplicate IP,10.0.0.1,Router,,Will fail due to duplicate IP in same file
+Existing Device,192.168.2.101,IoT Device,,Will fail due to existing IP

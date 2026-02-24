@@ -1,8 +1,11 @@
 from typing import List
 from datetime import datetime, timedelta
+import csv
+import io
+import ipaddress
 import json
 
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, status, UploadFile, File
 from sqlalchemy import func, text, literal_column
 from sqlalchemy.orm import Session
 
@@ -215,6 +218,119 @@ def export_devices(
         media_type="text/csv",
         headers={"Content-Disposition": "attachment; filename=devices_inventory.csv"}
     )
+
+
+@router.post("/import")
+async def import_devices(
+    file: UploadFile = File(...),
+    db: Session = Depends(get_db),
+    current_user=Depends(get_current_user),
+):
+    """
+    Bulk import devices from a CSV file.
+    Required CSV columns: name, ip_address, type
+    Optional columns: location, notes, is_active
+    Returns a summary of imported and failed rows.
+    """
+    if current_user.role not in ["admin", "operator"]:
+        raise HTTPException(status_code=403, detail="Not authorized")
+
+    VALID_TYPES = {"Router", "Switch", "Server", "IoT Device"}
+
+    if not file.filename.endswith(".csv"):
+        raise HTTPException(status_code=400, detail="Only CSV files are accepted")
+
+    content = await file.read()
+    text_content = content.decode("utf-8-sig")  # handle BOM if present
+    reader = csv.DictReader(io.StringIO(text_content))
+
+    required_cols = {"name", "ip_address", "type"}
+    if not required_cols.issubset(set(reader.fieldnames or [])):
+        missing = required_cols - set(reader.fieldnames or [])
+        raise HTTPException(
+            status_code=400,
+            detail=f"CSV is missing required columns: {', '.join(missing)}"
+        )
+
+    # Collect all existing IPs for duplicate detection across rows
+    existing_ips = {row[0] for row in db.query(Device.ip_address).all()}
+
+    results = []
+    seen_ips_in_file = set()
+
+    for i, row in enumerate(reader, start=2):  # row 1 is the header
+        name = (row.get("name") or "").strip()
+        ip_address = (row.get("ip_address") or "").strip()
+        device_type = (row.get("type") or "").strip()
+        location = (row.get("location") or "").strip() or None
+        notes = (row.get("notes") or "").strip() or None
+        is_active_raw = (row.get("is_active") or "true").strip().lower()
+        is_active = is_active_raw not in ("false", "0", "no", "inactive")
+
+        # Validate required fields
+        if not name:
+            results.append({"row": i, "name": name or "", "status": "failed", "reason": "Name is required"})
+            continue
+        if not ip_address:
+            results.append({"row": i, "name": name, "status": "failed", "reason": "IP address is required"})
+            continue
+        if device_type not in VALID_TYPES:
+            results.append({"row": i, "name": name, "status": "failed", "reason": f"Invalid type '{device_type}'. Must be one of: {', '.join(VALID_TYPES)}"})
+            continue
+
+        # Validate IP format (basic)
+        try:
+            ipaddress.ip_address(ip_address)
+        except ValueError:
+            results.append({"row": i, "name": name, "status": "failed", "reason": f"Invalid IP address format: '{ip_address}'"})
+            continue
+
+        # Check for duplicate IP in this file
+        if ip_address in seen_ips_in_file:
+            results.append({"row": i, "name": name, "status": "failed", "reason": f"Duplicate IP address in CSV: {ip_address}"})
+            continue
+
+        # Check for existing device with same IP in DB
+        if ip_address in existing_ips:
+            results.append({"row": i, "name": name, "status": "failed", "reason": f"A device with IP {ip_address} already exists"})
+            continue
+
+        # Create the device
+        try:
+            device = Device(
+                name=name,
+                ip_address=ip_address,
+                type=device_type,
+                location=location,
+                notes=notes,
+                is_active=is_active,
+            )
+            db.add(device)
+            db.commit()
+            db.refresh(device)
+            seen_ips_in_file.add(ip_address)
+            existing_ips.add(ip_address)
+            log_action(
+                db=db,
+                action="device_created",
+                actor_email=current_user.email,
+                target_type="device",
+                target_name=name,
+            )
+            results.append({"row": i, "name": name, "status": "imported", "id": device.id})
+        except Exception as e:
+            db.rollback()
+            results.append({"row": i, "name": name, "status": "failed", "reason": str(e)})
+
+    imported = [r for r in results if r["status"] == "imported"]
+    failed = [r for r in results if r["status"] == "failed"]
+
+    return {
+        "total": len(results),
+        "imported": len(imported),
+        "failed": len(failed),
+        "results": results,
+    }
 
 
 @router.get("/{device_id}/history/export")
