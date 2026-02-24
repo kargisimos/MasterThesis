@@ -17,7 +17,6 @@ class Device(Base):
     name = Column(String, nullable=False)
     ip_address = Column(String, nullable=False)
     type = Column(String, nullable=False)
-    manufacturer = Column(String, nullable=True)
     model = Column(String, nullable=True)
     location = Column(String, nullable=True)
     notes = Column(String, nullable=True)

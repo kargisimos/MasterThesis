@@ -35,7 +35,6 @@ def create_device(
         name=device_in.name,
         ip_address=str(device_in.ip_address),
         type=device_in.type,
-        manufacturer=device_in.manufacturer,
         model=device_in.model,
         location=device_in.location,
         notes=device_in.notes,

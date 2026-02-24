@@ -237,8 +237,8 @@ async def forgot_password(
             to_emails=[user.email],
             is_html=True
         )
-    except Exception as e:
-        print(f"Failed to send reset email: {e}")
+    except Exception:
+        pass
 
     return {"message": "If an account exists for this email, a reset link has been sent."}
 

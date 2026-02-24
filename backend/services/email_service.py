@@ -23,18 +23,14 @@ def send_email_sync(subject: str, content: str, to_emails: list[str], is_html: b
     context = ssl.create_default_context()
 
     try:
-        print(f"DEBUG: Attempting to send email to {to_emails} via {settings.SMTP_HOST}:{settings.SMTP_PORT}")
         with smtplib.SMTP(settings.SMTP_HOST, settings.SMTP_PORT) as server:
             server.ehlo()
             server.starttls(context=context)
             server.ehlo()
             server.login(settings.SMTP_USER, settings.SMTP_PASSWORD)
             server.send_message(msg)
-        print(f"SUCCESS: Email sent successfully to {to_emails}")
     except Exception as e:
         print(f"ERROR: Failed to send email to {to_emails}: {e}")
-        import traceback
-        traceback.print_exc()
 
 async def send_email(subject: str, content: str, to_emails: list[str], is_html: bool = False):
     await asyncio.to_thread(send_email_sync, subject, content, to_emails, is_html)

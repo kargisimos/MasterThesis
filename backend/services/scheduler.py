@@ -5,12 +5,11 @@ from models.system_settings import SystemSettings
 from config import settings
 
 async def start_scheduler():
-    print("Background Monitoring Scheduler initialized.")
     while True:
         try:
             await run_monitoring_cycle()
-        except Exception as e:
-            print(f"Error in monitoring cycle: {e}")
+        except Exception:
+            pass
         
         # Fetch interval from db
         db = SessionLocal()

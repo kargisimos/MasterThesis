@@ -21,6 +21,7 @@ export default function Dashboard() {
   // New State for Management View
   const [showManageView, setShowManageView] = useState(false);
   const [services, setServices] = useState([]);
+  const [servicesLoading, setServicesLoading] = useState(false);
   const [systemSettings, setSystemSettings] = useState(null);
   const [servicesError, setServicesError] = useState(null);
   const [managingAction, setManagingAction] = useState(null); // 'reboot', or service name
@@ -293,19 +294,19 @@ export default function Dashboard() {
     const latWarn = systemSettings?.latency_warning_threshold || 40;
 
     if (type === "cpu") {
-      if (value > cpuCrit) return "#ef4444";
-      if (value > cpuWarn) return "#f59e0b"; 
-      return "#10b981";
+      if (value > cpuCrit) return "var(--danger)";
+      if (value > cpuWarn) return "var(--warning)"; 
+      return "var(--success)";
     }
     if (type === "mem") {
-      if (value > memCrit) return "#ef4444";
-      if (value > memWarn) return "#f59e0b"; 
-      return "#10b981";
+      if (value > memCrit) return "var(--danger)";
+      if (value > memWarn) return "var(--warning)"; 
+      return "var(--success)";
     }
     if (type === "lat") {
-      if (value > latWarn) return "#ef4444";
-      if (value > latWarn / 2) return "#f59e0b"; // arbitrary midpoint for warning scale
-      return "#10b981";
+      if (value > latWarn) return "var(--danger)";
+      if (value > latWarn / 2) return "var(--warning)"; 
+      return "var(--success)";
     }
     return "inherit";
   };
@@ -377,7 +378,7 @@ export default function Dashboard() {
 
   const ProtocolBadge = ({ type, configured, failed }) => {
     // Hierarchy: Not Configured (Gray) > Failed (Red) > Working (Green)
-    const color = !configured ? "#cfcfcf" : (failed ? "#ef4444" : "#10b981");
+    const color = !configured ? "var(--text-muted)" : (failed ? "var(--danger)" : "var(--success)");
     return (
       <span style={{
         fontSize: "0.65rem",

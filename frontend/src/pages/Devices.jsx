@@ -227,8 +227,8 @@ export default function Devices() {
                 <span style={{ 
                   padding: "4px 8px", 
                   borderRadius: "12px", 
-                  backgroundColor: device.is_active ? "#d1fae5" : "#f3f4f6", 
-                  color: device.is_active ? "#065f46" : "#6b7280",
+                  backgroundColor: device.is_active ? "var(--success-muted)" : "var(--bg-color)", 
+                  color: device.is_active ? "var(--success-text)" : "var(--text-muted)",
                   fontSize: "0.75rem",
                   fontWeight: "600"
                 }}>
@@ -376,8 +376,8 @@ export default function Devices() {
                           borderRadius: "10px",
                           fontSize: "0.75rem",
                           fontWeight: 600,
-                          backgroundColor: r.status === "imported" ? "#d1fae5" : "#fee2e2",
-                          color: r.status === "imported" ? "#065f46" : "#991b1b",
+                          backgroundColor: r.status === "imported" ? "var(--success-muted)" : "var(--danger-muted)",
+                          color: r.status === "imported" ? "var(--success-text)" : "var(--danger-text)",
                         }}>
                           {r.status === "imported" ? "✓ Imported" : "✗ Failed"}
                         </span>

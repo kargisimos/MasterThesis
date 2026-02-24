@@ -57,6 +57,9 @@
 
   --primary: #60a5fa;
   --primary-hover: #3b82f6;
+  --success: #10b981;
+  --danger: #ef4444;
+  --warning: #f59e0b;
 
   --table-header-bg: #1f2937;
   /* Same as card */
@@ -71,6 +74,7 @@
   --success-text: #34d399;
   --danger-text: #f87171;
 
+  --critical: var(--danger);
   --critical-muted: rgba(239, 68, 68, 0.15);
   --warning-muted: rgba(245, 158, 11, 0.15);
   --info-muted: rgba(59, 130, 246, 0.15);

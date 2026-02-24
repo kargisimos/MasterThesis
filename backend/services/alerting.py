@@ -14,15 +14,11 @@ async def notify_users(subject: str, body: str):
     db = SessionLocal()
     try:
         users = db.query(User).filter(User.receive_email_notifications == True).all()
-        print(f"DEBUGGING: Found {len(users)} users that have enabled email notifications.")
         if users:
             emails = [u.email for u in users]
-            print(f"DEBUGGING: Sending {subject} email to: {emails}")
             await send_email(subject, body, emails)
-        else:
-            print("DEBUGGING: No users found with email notifications enabled.")
-    except Exception as e:
-        print(f"DEBUGGING ERROR in notify_users: {e}")
+    except Exception:
+        pass
     finally:
         db.close()
 

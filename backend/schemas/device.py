@@ -8,7 +8,6 @@ class DeviceBase(BaseModel):
     name: str = Field(..., example="Office Router")
     type: DeviceType = Field(..., example="Router")
     ip_address: IPvAnyAddress = Field(..., example="192.168.1.1")
-    manufacturer: Optional[str] = Field(None, example="Cisco")
     model: Optional[str] = Field(None, example="RV340")
     location: Optional[str] = Field(None, example="Data Center Rack 3")
     notes: Optional[str] = Field(None, example="Main office router")
@@ -21,7 +20,6 @@ class DeviceUpdate(BaseModel):
     name: Optional[str] = None
     type: Optional[DeviceType] = None
     ip_address: Optional[IPvAnyAddress] = None
-    manufacturer: Optional[str] = None
     model: Optional[str] = None
     location: Optional[str] = None
     notes: Optional[str] = None

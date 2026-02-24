@@ -32,8 +32,7 @@ async def ping_device(ip: str):
             return True, float(match.group(1)) if match else 0.0
         
         return False, None
-    except Exception as e:
-        print(f"DEBUG: Ping failure for {ip}: {e}")
+    except Exception:
         return False, None
 
 
@@ -234,8 +233,7 @@ async def poll_device(device_id: int) -> list[str]:
         await manager.broadcast({"type": "device_update", "device": payload})
         await redis_service.publish_device_update(payload)
         
-    except Exception as e:
-        print(f"Poll error {device_id}: {e}")
+    except Exception:
         db.rollback()
     finally:
         db.close()
