@@ -5,14 +5,8 @@ from services.auditlogger import log_action
 from services.email_service import send_email
 import asyncio
 
-# Thresholds
-CPU_CRITICAL = 90.0
-MEMORY_CRITICAL = 90.0
-LATENCY_WARNING = 40.0
-
-# Warning levels (for dashboard/logs only)
-CPU_WARNING = 70.0
-MEMORY_WARNING = 70.0
+# Thresholds will be loaded dynamically from the db
+from models.system_settings import SystemSettings
 
 from database import SessionLocal
 
@@ -34,6 +28,15 @@ async def notify_users(subject: str, body: str):
 
 async def check_for_alerts(db: Session, device: Device) -> list[str]:
     critical_alerts = []
+    
+    # Load dynamic thresholds
+    settings = db.query(SystemSettings).first()
+    # Fallback values if settings not found
+    cpu_crit = settings.cpu_critical_threshold if settings else 90.0
+    mem_crit = settings.memory_critical_threshold if settings else 90.0
+    lat_warn = settings.latency_warning_threshold if settings else 40.0
+    cpu_warn = settings.cpu_warning_threshold if settings else 70.0
+    mem_warn = settings.memory_warning_threshold if settings else 70.0
 
     # 1. Host Offline (Critical)
     if device.last_status == "offline":
@@ -79,7 +82,7 @@ async def check_for_alerts(db: Session, device: Device) -> list[str]:
 
     # 3. CPU Usage
     if device.last_cpu:
-        if device.last_cpu > CPU_CRITICAL:
+        if device.last_cpu > cpu_crit:
             log_action(
                 db=db,
                 action="alert_critical_cpu",
@@ -90,7 +93,7 @@ async def check_for_alerts(db: Session, device: Device) -> list[str]:
             critical_alerts.append(
                 f"High CPU on {device.name}: Device {device.name} ({device.ip_address}) CPU usage is at {device.last_cpu}%."
             )
-        elif device.last_cpu > CPU_WARNING:
+        elif device.last_cpu > cpu_warn:
             log_action(
                 db=db,
                 action="alert_warning_cpu",
@@ -101,7 +104,7 @@ async def check_for_alerts(db: Session, device: Device) -> list[str]:
 
     # 4. Memory Usage
     if device.last_memory:
-        if device.last_memory > MEMORY_CRITICAL:
+        if device.last_memory > mem_crit:
             log_action(
                 db=db,
                 action="alert_critical_memory",
@@ -112,7 +115,7 @@ async def check_for_alerts(db: Session, device: Device) -> list[str]:
             critical_alerts.append(
                 f"High Memory on {device.name}: Device {device.name} ({device.ip_address}) Memory usage is at {device.last_memory}%."
             )
-        elif device.last_memory > MEMORY_WARNING:
+        elif device.last_memory > mem_warn:
             log_action(
                 db=db,
                 action="alert_warning_memory",
@@ -122,7 +125,7 @@ async def check_for_alerts(db: Session, device: Device) -> list[str]:
             )
 
     # 5. Latency (Warning)
-    if device.last_latency and device.last_latency > LATENCY_WARNING:
+    if device.last_latency and device.last_latency > lat_warn:
         log_action(
             db=db,
             action="alert_warning_latency",

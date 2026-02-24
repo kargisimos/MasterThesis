@@ -1,6 +1,6 @@
 from fastapi import FastAPI
 from database import Base, engine, SessionLocal
-from api import health, auth, users, auditlogs, devices, websocket
+from api import health, auth, users, auditlogs, devices, websocket, settings_api
 from api.bootstrap import create_default_admin
 from services.scheduler import register_scheduler
 from services.redis_service import redis_service
@@ -59,6 +59,7 @@ app.include_router(auth.router, prefix="/auth")
 app.include_router(users.router, prefix="/users")
 app.include_router(auditlogs.router, prefix="/auditlogs")
 app.include_router(devices.router, prefix="/devices")
+app.include_router(settings_api.router, prefix="/settings")
 app.include_router(websocket.router)
 
 

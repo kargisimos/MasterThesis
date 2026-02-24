@@ -20,7 +20,6 @@ class Settings(BaseSettings):
 
     DEVICE_CREDENTIAL_SECRET_KEY: str
     
-    POLLING_INTERVAL: int
     REDIS_HOST: str
     REDIS_PORT: int
     

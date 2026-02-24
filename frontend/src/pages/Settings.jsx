@@ -20,6 +20,9 @@ export default function Settings() {
   const [newPassword, setNewPassword] = useState("");
   const [message, setMessage] = useState("");
 
+  const [systemSettings, setSystemSettings] = useState(null);
+  const [settingsMessage, setSettingsMessage] = useState("");
+
   useEffect(() => {
     fetchProfile();
   }, []);
@@ -28,9 +31,35 @@ export default function Settings() {
     try {
       const res = await api.get("/users/me");
       setProfile(res.data);
+      if (res.data.role === "admin") {
+          fetchSystemSettings();
+      }
     } catch {
       // handled by interceptor
     }
+  };
+
+  const fetchSystemSettings = async () => {
+      try {
+          const res = await api.get("/settings/");
+          setSystemSettings(res.data);
+      } catch (err) {
+          console.error("Failed to fetch system settings", err);
+      }
+  };
+
+  const saveSystemSettings = async (e) => {
+      e.preventDefault();
+      setSettingsMessage("");
+      try {
+          const res = await api.patch("/settings/", systemSettings);
+          setSystemSettings(res.data);
+          setSettingsMessage("System settings saved successfully.");
+          setTimeout(() => setSettingsMessage(""), 3000);
+      } catch (err) {
+          setSettingsMessage("Failed to save settings.");
+          setTimeout(() => setSettingsMessage(""), 3000);
+      }
   };
 
   const handleChangePassword = async (e) => {
@@ -133,6 +162,75 @@ export default function Settings() {
             Change Password
         </button>
         </section>
+
+        {profile && profile.role === "admin" && systemSettings && (
+            <section style={{ marginBottom: "30px" }}>
+                <h2>System Defaults</h2>
+                <div style={{ background: "var(--bg-color)", padding: "20px", borderRadius: "10px", border: "1px solid var(--card-border)" }}>
+                    <form onSubmit={saveSystemSettings}>
+                        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "15px" }}>
+                            <div>
+                                <label style={{ display: "block", marginBottom: "8px", fontWeight: "600", fontSize: "0.9rem" }}>Polling Interval (seconds)</label>
+                                <input 
+                                    type="number" 
+                                    min="10"
+                                    value={systemSettings.polling_interval} 
+                                    onChange={(e) => setSystemSettings({...systemSettings, polling_interval: parseInt(e.target.value)})} 
+                                />
+                            </div>
+                            <div>
+                                <label style={{ display: "block", marginBottom: "8px", fontWeight: "600", fontSize: "0.9rem" }}>Latency Warning (ms)</label>
+                                <input 
+                                    type="number" 
+                                    value={systemSettings.latency_warning_threshold} 
+                                    onChange={(e) => setSystemSettings({...systemSettings, latency_warning_threshold: parseFloat(e.target.value)})} 
+                                />
+                            </div>
+                            <div>
+                                <label style={{ display: "block", marginBottom: "8px", fontWeight: "600", fontSize: "0.9rem" }}>CPU Warning (%)</label>
+                                <input 
+                                    type="number" 
+                                    value={systemSettings.cpu_warning_threshold} 
+                                    onChange={(e) => setSystemSettings({...systemSettings, cpu_warning_threshold: parseFloat(e.target.value)})} 
+                                />
+                            </div>
+                            <div>
+                                <label style={{ display: "block", marginBottom: "8px", fontWeight: "600", fontSize: "0.9rem" }}>CPU Critical (%)</label>
+                                <input 
+                                    type="number" 
+                                    value={systemSettings.cpu_critical_threshold} 
+                                    onChange={(e) => setSystemSettings({...systemSettings, cpu_critical_threshold: parseFloat(e.target.value)})} 
+                                />
+                            </div>
+                            <div>
+                                <label style={{ display: "block", marginBottom: "8px", fontWeight: "600", fontSize: "0.9rem" }}>Memory Warning (%)</label>
+                                <input 
+                                    type="number" 
+                                    value={systemSettings.memory_warning_threshold} 
+                                    onChange={(e) => setSystemSettings({...systemSettings, memory_warning_threshold: parseFloat(e.target.value)})} 
+                                />
+                            </div>
+                            <div>
+                                <label style={{ display: "block", marginBottom: "8px", fontWeight: "600", fontSize: "0.9rem" }}>Memory Critical (%)</label>
+                                <input 
+                                    type="number" 
+                                    value={systemSettings.memory_critical_threshold} 
+                                    onChange={(e) => setSystemSettings({...systemSettings, memory_critical_threshold: parseFloat(e.target.value)})} 
+                                />
+                            </div>
+                        </div>
+                        <div style={{ display: "flex", gap: "15px", alignItems: "center", marginTop: "15px" }}>
+                            <button type="submit" className="add-device-btn">Save Settings</button>
+                            {settingsMessage && (
+                                <span style={{ color: settingsMessage.includes("success") ? "var(--success)" : "var(--danger)", fontSize: "0.9rem", fontWeight: "500" }}>
+                                    {settingsMessage}
+                                </span>
+                            )}
+                        </div>
+                    </form>
+                </div>
+            </section>
+        )}
 
         <section>
         <h2>System Information</h2>

@@ -21,7 +21,7 @@ export default function Dashboard() {
   // New State for Management View
   const [showManageView, setShowManageView] = useState(false);
   const [services, setServices] = useState([]);
-  const [servicesLoading, setServicesLoading] = useState(false);
+  const [systemSettings, setSystemSettings] = useState(null);
   const [servicesError, setServicesError] = useState(null);
   const [managingAction, setManagingAction] = useState(null); // 'reboot', or service name
   const [confirmModal, setConfirmModal] = useState(null);
@@ -39,6 +39,20 @@ export default function Dashboard() {
       console.error("Failed to fetch dashboard data:", error);
     } finally {
       setIsLoading(false);
+    }
+  };
+
+  const fetchSystemSettings = async () => {
+    try {
+      const res = await fetch("http://localhost:8000/settings/", {
+        headers: { "Authorization": `Bearer ${localStorage.getItem("access_token")}` }
+      });
+      if (res.ok) {
+        const data = await res.json();
+        setSystemSettings(data);
+      }
+    } catch (e) {
+      console.error("Failed to fetch settings for dashboard colors", e);
     }
   };
 
@@ -150,6 +164,7 @@ export default function Dashboard() {
 
   useEffect(() => {
     fetchDevices();
+    fetchSystemSettings();
     const interval = setInterval(fetchDevices, 30000);
     return () => clearInterval(interval);
   }, [timeframe]);
@@ -244,15 +259,22 @@ export default function Dashboard() {
         } catch (e) {
           console.error("Failed to parse failing protocols:", e);
         }
-        if (d.last_cpu > 90) triggers.push({ id: `cpu-${d.id}`, priority: "critical", msg: `${d.name}: Critical CPU Usage (${d.last_cpu}%)`, time: "Recent" });
-        else if (d.last_cpu > 70) triggers.push({ id: `cpu-${d.id}`, priority: "warning", msg: `${d.name}: High CPU Usage (${d.last_cpu}%)`, time: "Recent" });
-        if (d.last_memory > 90) triggers.push({ id: `mem-${d.id}`, priority: "critical", msg: `${d.name}: Critical Memory Usage (${d.last_memory}%)`, time: "Recent" });
-        else if (d.last_memory > 70) triggers.push({ id: `mem-${d.id}`, priority: "warning", msg: `${d.name}: High Memory Usage (${d.last_memory}%)`, time: "Recent" });
-        if (d.last_latency > 40) triggers.push({ id: `lat-${d.id}`, priority: "warning", msg: `${d.name}: High Latency (${d.last_latency}ms)`, time: "Recent" });
+        
+        const cpuWarn = systemSettings?.cpu_warning_threshold || 70;
+        const cpuCrit = systemSettings?.cpu_critical_threshold || 90;
+        const memWarn = systemSettings?.memory_warning_threshold || 70;
+        const memCrit = systemSettings?.memory_critical_threshold || 90;
+        const latWarn = systemSettings?.latency_warning_threshold || 40;
+
+        if (d.last_cpu > cpuCrit) triggers.push({ id: `cpu-${d.id}`, priority: "critical", msg: `${d.name}: Critical CPU Usage (${d.last_cpu}%)`, time: "Recent" });
+        else if (d.last_cpu > cpuWarn) triggers.push({ id: `cpu-${d.id}`, priority: "warning", msg: `${d.name}: High CPU Usage (${d.last_cpu}%)`, time: "Recent" });
+        if (d.last_memory > memCrit) triggers.push({ id: `mem-${d.id}`, priority: "critical", msg: `${d.name}: Critical Memory Usage (${d.last_memory}%)`, time: "Recent" });
+        else if (d.last_memory > memWarn) triggers.push({ id: `mem-${d.id}`, priority: "warning", msg: `${d.name}: High Memory Usage (${d.last_memory}%)`, time: "Recent" });
+        if (d.last_latency > latWarn) triggers.push({ id: `lat-${d.id}`, priority: "warning", msg: `${d.name}: High Latency (${d.last_latency}ms)`, time: "Recent" });
       }
     });
     return triggers.sort((a, b) => (a.priority === "critical" ? -1 : 1)).slice(0, 10);
-  }, [devices]);
+  }, [devices, systemSettings]);
 
   const totalDevices = devices.length;
   const onlineCount = devices.filter(d => d.is_active && d.last_status === "online").length;
@@ -264,14 +286,25 @@ export default function Dashboard() {
 
   const getMetricColor = (type, value) => {
     if (value === null || value === undefined) return "var(--text-muted)";
-    if (type === "cpu" || type === "mem") {
-      if (value > 90) return "#ef4444";
-      if (value > 80) return "#f59e0b"; // 85 for mem in original, simplifying
+    const cpuWarn = systemSettings?.cpu_warning_threshold || 70;
+    const cpuCrit = systemSettings?.cpu_critical_threshold || 90;
+    const memWarn = systemSettings?.memory_warning_threshold || 70;
+    const memCrit = systemSettings?.memory_critical_threshold || 90;
+    const latWarn = systemSettings?.latency_warning_threshold || 40;
+
+    if (type === "cpu") {
+      if (value > cpuCrit) return "#ef4444";
+      if (value > cpuWarn) return "#f59e0b"; 
+      return "#10b981";
+    }
+    if (type === "mem") {
+      if (value > memCrit) return "#ef4444";
+      if (value > memWarn) return "#f59e0b"; 
       return "#10b981";
     }
     if (type === "lat") {
-      if (value > 40) return "#ef4444";
-      if (value > 20) return "#f59e0b";
+      if (value > latWarn) return "#ef4444";
+      if (value > latWarn / 2) return "#f59e0b"; // arbitrary midpoint for warning scale
       return "#10b981";
     }
     return "inherit";
