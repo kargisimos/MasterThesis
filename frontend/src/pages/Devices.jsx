@@ -171,23 +171,27 @@ export default function Devices() {
       )}
 
       <div style={{ display: "flex", gap: "10px", alignItems: "center" }}>
-        <button className="add-device-btn" onClick={() => setShowAddModal(true)}>
-          Add Device
-        </button>
-        <button
-          className="add-device-btn"
-          onClick={() => importInputRef.current?.click()}
-          disabled={importLoading}
-        >
-          {importLoading ? "Importing…" : "⬆ Import CSV"}
-        </button>
-        <input
-          ref={importInputRef}
-          type="file"
-          accept=".csv"
-          style={{ display: "none" }}
-          onChange={handleImportCSV}
-        />
+        {userRole !== "viewer" && (
+          <>
+            <button className="add-device-btn" onClick={() => setShowAddModal(true)}>
+              Add Device
+            </button>
+            <button
+              className="add-device-btn"
+              onClick={() => importInputRef.current?.click()}
+              disabled={importLoading}
+            >
+              {importLoading ? "Importing…" : "⬆ Import CSV"}
+            </button>
+            <input
+              ref={importInputRef}
+              type="file"
+              accept=".csv"
+              style={{ display: "none" }}
+              onChange={handleImportCSV}
+            />
+          </>
+        )}
       </div>
 
       <input
@@ -206,7 +210,7 @@ export default function Devices() {
             <th>Location</th>
             <th>Notes</th>
             <th>Status</th>
-            <th>Actions</th>
+            {userRole !== "viewer" && <th>Actions</th>}
           </tr>
         </thead>
         <tbody>
@@ -231,13 +235,15 @@ export default function Devices() {
                   {device.is_active ? "ACTIVE" : "INACTIVE"}
                 </span>
               </td>
-              <td>
-                <button onClick={() => setEditingDevice({ ...device })}>Edit</button>
-                <button className="danger" onClick={() => deleteDevice(device)}>
-                  Delete
-                </button>
-                <button onClick={() => openCredentialsModal(device)}>Credentials</button>
-              </td>
+              {userRole !== "viewer" && (
+                <td>
+                  <button onClick={() => setEditingDevice({ ...device })}>Edit</button>
+                  <button className="danger" onClick={() => deleteDevice(device)}>
+                    Delete
+                  </button>
+                  <button onClick={() => openCredentialsModal(device)}>Credentials</button>
+                </td>
+              )}
             </tr>
           ))}
         </tbody>

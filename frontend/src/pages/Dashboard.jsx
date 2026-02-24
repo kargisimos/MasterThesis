@@ -559,10 +559,10 @@ export default function Dashboard() {
           <div 
             key={device.id} 
             className="device-card" 
-            onClick={() => userRole !== "viewer" && setDeviceModal(device)}
+            onClick={() => setDeviceModal(device)}
             style={{ 
               filter: device.is_active ? "none" : "grayscale(100%) opacity(0.5)",
-              cursor: device.is_active ? "pointer" : "default" 
+              cursor: "pointer" 
             }}
           >
             <div style={{ display: "flex", justifyContent: "space-between", marginBottom: "8px" }}>
@@ -619,20 +619,22 @@ export default function Dashboard() {
                 <div style={{ color: "var(--text-muted)", fontSize: "0.9rem" }}>IP: {deviceModal.ip_address} | Type: {deviceModal.type.toUpperCase()}</div>
               </div>
               <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
-                <button 
-                  onClick={() => setShowManageView(!showManageView)}
-                  style={{ 
-                    padding: "6px 16px", 
-                    borderRadius: "8px", 
-                    backgroundColor: showManageView ? "var(--accent)" : "transparent",
-                    color: showManageView ? "#fff" : "var(--accent)", 
-                    border: "1px solid var(--accent)",
-                    fontWeight: "600",
-                    transition: "all 0.2s"
-                  }}
-                >
-                  {showManageView ? "View Diagnostics" : "⚙️ Manage Device"}
-                </button>
+                {userRole !== "viewer" && (
+                  <button 
+                    onClick={() => setShowManageView(!showManageView)}
+                    style={{ 
+                      padding: "6px 16px", 
+                      borderRadius: "8px", 
+                      backgroundColor: showManageView ? "var(--accent)" : "transparent",
+                      color: showManageView ? "#fff" : "var(--accent)", 
+                      border: "1px solid var(--accent)",
+                      fontWeight: "600",
+                      transition: "all 0.2s"
+                    }}
+                  >
+                    {showManageView ? "View Diagnostics" : "⚙️ Manage Device"}
+                  </button>
+                )}
                 
                 {!showManageView && (
                   <>
@@ -671,7 +673,7 @@ export default function Dashboard() {
               </div>
             </div>
             
-            {showManageView ? (
+            {showManageView && userRole !== "viewer" ? (
               <div style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
                 <div className="dashboard-chart-card" style={{ padding: '24px' }}>
                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' }}>
