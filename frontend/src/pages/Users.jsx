@@ -21,6 +21,7 @@ export default function Users() {
     role: "viewer",
     is_active: true,
   });
+  const [modalError, setModalError] = useState("");
 
   let currentUserEmail = null;
   const token = localStorage.getItem("access_token");
@@ -61,10 +62,9 @@ export default function Users() {
       setShowAddModal(false);
       setNewUser({ email: "", full_name: "", password: "", role: "viewer", is_active: true });
       fetchUsers();
-      fetchUsers();
       showSuccess("User created successfully!");
-    } catch {
-      alert("Failed to create user.");
+    } catch (error) {
+      setModalError(error.response?.data?.detail || "Failed to create user.");
     }
   };
 
@@ -206,7 +206,7 @@ export default function Users() {
       </div>
 
       {showAddModal && (
-        <div className="modal-overlay" onClick={() => setShowAddModal(false)}>
+        <div className="modal-overlay" onClick={() => { setShowAddModal(false); setModalError(""); }}>
           <div className="modal" onClick={(e) => e.stopPropagation()}>
             <h2>Add User</h2>
             <form onSubmit={createUser}>
@@ -226,15 +226,26 @@ export default function Users() {
                   setNewUser({ ...newUser, full_name: e.target.value })
                 }
               />
-              <input
-                type="password"
-                placeholder="Password"
-                required
-                value={newUser.password}
-                onChange={(e) =>
-                  setNewUser({ ...newUser, password: e.target.value })
-                }
-              />
+              <div style={{ marginBottom: "15px" }}>
+                <input
+                  type="password"
+                  placeholder="Password"
+                  required
+                  value={newUser.password}
+                  onChange={(e) =>
+                    setNewUser({ ...newUser, password: e.target.value })
+                  }
+                  style={{ width: "100%" }}
+                />
+                <small style={{ color: "var(--text-muted)", fontSize: "0.8rem", display: "block", marginTop: "4px" }}>
+                  Must be at least 8 chars, with 1 uppercase, 1 digit, and 1 special character.
+                </small>
+              </div>
+              {modalError && (
+                <p style={{ color: "var(--danger)", fontSize: "0.85rem", marginTop: "10px", textAlign: "center" }}>
+                  {modalError}
+                </p>
+              )}
               <select
                 value={newUser.role}
                 onChange={(e) =>
@@ -253,9 +264,9 @@ export default function Users() {
                 <option value="Inactive">Inactive</option>
               </select>
               <button type="submit">Create</button>
-              <button type="button" onClick={() => setShowAddModal(false)}>
-                Cancel
-              </button>
+              <button type="button" onClick={() => { setShowAddModal(false); setModalError(""); }}>
+                 Cancel
+               </button>
             </form>
           </div>
         </div>

@@ -62,6 +62,9 @@ export default function ResetPassword() {
                         value={password}
                         onChange={(e) => setPassword(e.target.value)}
                     />
+                    <small style={{ color: "var(--text-muted)", fontSize: "0.8rem", display: "block", marginTop: "4px", marginBottom: "10px" }}>
+                        Must be at least 8 chars, with 1 uppercase, 1 digit, and 1 special character.
+                    </small>
                     <input
                         type="password"
                         placeholder="Confirm New Password"

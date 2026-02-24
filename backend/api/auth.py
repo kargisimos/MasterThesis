@@ -21,6 +21,7 @@ from services.security import (
     create_access_token,
     create_refresh_token,
     oauth2_scheme,
+    validate_password_policy
 )
 from services.email_service import send_email
 import secrets
@@ -136,6 +137,7 @@ def register(user: UserCreate, db: Session = Depends(get_db), token: str = Depen
     if existing_user:
         raise HTTPException(status_code=400, detail="Email already registered")
 
+    validate_password_policy(user.password)
     hashed_password = get_password_hash(user.password)
     db_user = User(
         email=user.email,
@@ -181,6 +183,7 @@ def change_password(
     if not verify_password(payload.current_password, user.hashed_password):
         raise HTTPException(status_code=400, detail="Current password is incorrect")
 
+    validate_password_policy(payload.new_password)
     user.hashed_password = get_password_hash(payload.new_password)
     db.commit()
 
@@ -254,6 +257,8 @@ def reset_password(
         )
 
     user = reset_token.user
+    
+    validate_password_policy(payload.new_password)
     user.hashed_password = get_password_hash(payload.new_password)
     
     # Delete the token after use

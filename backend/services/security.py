@@ -22,7 +22,19 @@ def verify_password(plain_password, hashed_password):
     return pwd_context.verify(plain_password, hashed_password)
 
 
-def get_password_hash(password):
+import re
+
+def validate_password_policy(password: str):
+    if len(password) < 8:
+        raise HTTPException(status_code=400, detail="Password must be at least 8 characters long")
+    if not any(char.isupper() for char in password):
+        raise HTTPException(status_code=400, detail="Password must contain at least one uppercase letter (A-Z)")
+    if not any(char.isdigit() for char in password):
+        raise HTTPException(status_code=400, detail="Password must contain at least one digit (0-9)")
+    if not re.search(r"[!@#$%^&*(),.?\":{}|<>]", password):
+        raise HTTPException(status_code=400, detail="Password must contain at least one special character")
+
+def get_password_hash(password: str):
     return pwd_context.hash(password)
 
 

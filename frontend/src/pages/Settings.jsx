@@ -75,8 +75,12 @@ export default function Settings() {
       setCurrentPassword("");
       setNewPassword("");
       setTimeout(() => setShowPasswordModal(false), 800);
-    } catch {
-      setMessage("Wrong current password.");
+    } catch (error) {
+      if (error.response?.data?.detail) {
+        setMessage(error.response.data.detail);
+      } else {
+        setMessage("Wrong current password or invalid request.");
+      }
     }
   };
 
@@ -268,13 +272,19 @@ export default function Settings() {
                 onChange={(e) => setCurrentPassword(e.target.value)}
                 required
                 />
-                <input
-                type="password"
-                placeholder="New password"
-                value={newPassword}
-                onChange={(e) => setNewPassword(e.target.value)}
-                required
-                />
+                <div style={{ marginBottom: "15px" }}>
+                  <input
+                    type="password"
+                    placeholder="New password"
+                    value={newPassword}
+                    onChange={(e) => setNewPassword(e.target.value)}
+                    required
+                    style={{ width: "100%" }}
+                  />
+                  <small style={{ color: "var(--text-muted)", fontSize: "0.8rem", display: "block", marginTop: "4px" }}>
+                    Must be at least 8 chars, with 1 uppercase, 1 digit, and 1 special character.
+                  </small>
+                </div>
                 <button type="submit">Update</button>
                 <button
                 type="button"
