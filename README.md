@@ -5,6 +5,8 @@ This system is a specialized platform for monitoring and managing network infras
 
 The primary objective of this project is to demonstrate an efficient way to handle high-frequency data collection and real-time visualization while maintaining a secure and multi-user environment.
 
+![alt text](images/dashboard.png)
+
 ## Features
 - **Real-Time Data Streaming**: Uses WebSockets and Redis Pub/Sub to push updates to the dashboard the moment they are collected, eliminating the need for page refreshes.
 - **Support for Multiple Protocols**: Collects data through ICMP for availability/latency, SNMP (v2c) for hardware metrics, and SSH for direct system-level data.
