@@ -51,6 +51,18 @@ export default function Settings() {
   const saveSystemSettings = async (e) => {
       e.preventDefault();
       setSettingsMessage("");
+
+      if (systemSettings.cpu_warning_threshold >= systemSettings.cpu_critical_threshold) {
+          setSettingsMessage("CPU Warning must be less than CPU Critical.");
+          setTimeout(() => setSettingsMessage(""), 4000);
+          return;
+      }
+      if (systemSettings.memory_warning_threshold >= systemSettings.memory_critical_threshold) {
+          setSettingsMessage("Memory Warning must be less than Memory Critical.");
+          setTimeout(() => setSettingsMessage(""), 4000);
+          return;
+      }
+
       try {
           const res = await api.patch("/settings/", systemSettings);
           setSystemSettings(res.data);
@@ -170,61 +182,141 @@ export default function Settings() {
         {profile && profile.role === "admin" && systemSettings && (
             <section style={{ marginBottom: "30px" }}>
                 <h2>System Defaults</h2>
-                <div style={{ background: "var(--bg-color)", padding: "20px", borderRadius: "10px", border: "1px solid var(--card-border)" }}>
+                <div style={{ background: "var(--card-bg)", padding: "24px", borderRadius: "10px", border: "1px solid var(--card-border)" }}>
                     <form onSubmit={saveSystemSettings}>
-                        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "15px" }}>
-                            <div>
-                                <label style={{ display: "block", marginBottom: "8px", fontWeight: "600", fontSize: "0.9rem" }}>Polling Interval (seconds)</label>
+                        <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(280px, 1fr))", gap: "20px", marginBottom: "20px" }}>
+                            {/* Polling Interval */}
+                            <div className="slider-container">
+                                <div className="slider-header">
+                                    <span className="slider-label">Polling Interval</span>
+                                    <span className="slider-value primary">{systemSettings.polling_interval}s</span>
+                                </div>
+                                <span className="slider-description">Frequency of background host metrics collection.</span>
                                 <input 
-                                    type="number" 
+                                    type="range" 
+                                    className="slider-bar"
                                     min="10"
+                                    max="300"
+                                    step="5"
                                     value={systemSettings.polling_interval} 
                                     onChange={(e) => setSystemSettings({...systemSettings, polling_interval: parseInt(e.target.value)})} 
                                 />
                             </div>
-                            <div>
-                                <label style={{ display: "block", marginBottom: "8px", fontWeight: "600", fontSize: "0.9rem" }}>Latency Warning (ms)</label>
+
+                            {/* Latency Warning */}
+                            <div className="slider-container">
+                                <div className="slider-header">
+                                    <span className="slider-label">Latency Warning</span>
+                                    <span className="slider-value warning">{systemSettings.latency_warning_threshold} ms</span>
+                                </div>
+                                <span className="slider-description">Threshold for flagging warning-level host ping latency.</span>
                                 <input 
-                                    type="number" 
+                                    type="range" 
+                                    className="slider-bar warning"
+                                    min="10"
+                                    max="1000"
+                                    step="10"
                                     value={systemSettings.latency_warning_threshold} 
                                     onChange={(e) => setSystemSettings({...systemSettings, latency_warning_threshold: parseFloat(e.target.value)})} 
                                 />
                             </div>
-                            <div>
-                                <label style={{ display: "block", marginBottom: "8px", fontWeight: "600", fontSize: "0.9rem" }}>CPU Warning (%)</label>
+
+                            {/* CPU Warning */}
+                            <div className="slider-container" style={{
+                                borderColor: systemSettings.cpu_warning_threshold >= systemSettings.cpu_critical_threshold ? 'var(--danger)' : 'var(--card-border)'
+                            }}>
+                                <div className="slider-header">
+                                    <span className="slider-label">CPU Warning Threshold</span>
+                                    <span className="slider-value warning">{systemSettings.cpu_warning_threshold}%</span>
+                                </div>
+                                <span className="slider-description">Threshold for CPU usage alerts (warning state).</span>
                                 <input 
-                                    type="number" 
+                                    type="range" 
+                                    className="slider-bar warning"
+                                    min="10"
+                                    max="100"
+                                    step="1"
                                     value={systemSettings.cpu_warning_threshold} 
                                     onChange={(e) => setSystemSettings({...systemSettings, cpu_warning_threshold: parseFloat(e.target.value)})} 
                                 />
                             </div>
-                            <div>
-                                <label style={{ display: "block", marginBottom: "8px", fontWeight: "600", fontSize: "0.9rem" }}>CPU Critical (%)</label>
+
+                            {/* CPU Critical */}
+                            <div className="slider-container">
+                                <div className="slider-header">
+                                    <span className="slider-label">CPU Critical Threshold</span>
+                                    <span className="slider-value critical">{systemSettings.cpu_critical_threshold}%</span>
+                                </div>
+                                <span className="slider-description">Threshold for CPU usage critical alerts and system logs.</span>
                                 <input 
-                                    type="number" 
+                                    type="range" 
+                                    className="slider-bar critical"
+                                    min="10"
+                                    max="100"
+                                    step="1"
                                     value={systemSettings.cpu_critical_threshold} 
                                     onChange={(e) => setSystemSettings({...systemSettings, cpu_critical_threshold: parseFloat(e.target.value)})} 
                                 />
                             </div>
-                            <div>
-                                <label style={{ display: "block", marginBottom: "8px", fontWeight: "600", fontSize: "0.9rem" }}>Memory Warning (%)</label>
+
+                            {/* Memory Warning */}
+                            <div className="slider-container" style={{
+                                borderColor: systemSettings.memory_warning_threshold >= systemSettings.memory_critical_threshold ? 'var(--danger)' : 'var(--card-border)'
+                            }}>
+                                <div className="slider-header">
+                                    <span className="slider-label">Memory Warning Threshold</span>
+                                    <span className="slider-value warning">{systemSettings.memory_warning_threshold}%</span>
+                                </div>
+                                <span className="slider-description">Threshold for memory consumption warnings.</span>
                                 <input 
-                                    type="number" 
+                                    type="range" 
+                                    className="slider-bar warning"
+                                    min="10"
+                                    max="100"
+                                    step="1"
                                     value={systemSettings.memory_warning_threshold} 
                                     onChange={(e) => setSystemSettings({...systemSettings, memory_warning_threshold: parseFloat(e.target.value)})} 
                                 />
                             </div>
-                            <div>
-                                <label style={{ display: "block", marginBottom: "8px", fontWeight: "600", fontSize: "0.9rem" }}>Memory Critical (%)</label>
+
+                            {/* Memory Critical */}
+                            <div className="slider-container">
+                                <div className="slider-header">
+                                    <span className="slider-label">Memory Critical Threshold</span>
+                                    <span className="slider-value critical">{systemSettings.memory_critical_threshold}%</span>
+                                </div>
+                                <span className="slider-description">Threshold for critical memory consumption and email notifications.</span>
                                 <input 
-                                    type="number" 
+                                    type="range" 
+                                    className="slider-bar critical"
+                                    min="10"
+                                    max="100"
+                                    step="1"
                                     value={systemSettings.memory_critical_threshold} 
                                     onChange={(e) => setSystemSettings({...systemSettings, memory_critical_threshold: parseFloat(e.target.value)})} 
                                 />
                             </div>
                         </div>
-                        <div style={{ display: "flex", gap: "15px", alignItems: "center", marginTop: "15px" }}>
-                            <button type="submit" className="add-device-btn">Save Settings</button>
+
+                        {/* Validation Warnings */}
+                        {(systemSettings.cpu_warning_threshold >= systemSettings.cpu_critical_threshold || 
+                          systemSettings.memory_warning_threshold >= systemSettings.memory_critical_threshold) && (
+                            <div style={{ color: "var(--danger)", fontSize: "0.85rem", fontWeight: "600", marginBottom: "15px", display: "flex", gap: "6px", alignItems: "center" }}>
+                                <span>⚠️ Warning thresholds must be strictly less than critical thresholds.</span>
+                            </div>
+                        )}
+
+                        <div style={{ display: "flex", gap: "15px", alignItems: "center" }}>
+                            <button 
+                                type="submit" 
+                                className="add-device-btn"
+                                disabled={
+                                    systemSettings.cpu_warning_threshold >= systemSettings.cpu_critical_threshold || 
+                                    systemSettings.memory_warning_threshold >= systemSettings.memory_critical_threshold
+                                }
+                            >
+                                Save Settings
+                            </button>
                             {settingsMessage && (
                                 <span style={{ color: settingsMessage.includes("success") ? "var(--success)" : "var(--danger)", fontSize: "0.9rem", fontWeight: "500" }}>
                                     {settingsMessage}
